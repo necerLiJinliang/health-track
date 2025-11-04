@@ -5,29 +5,59 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { createUser } from '@/lib/api'
+import { useLoadingManager } from '@/lib/loadingManager'
+import { getErrorMessage } from '@/lib/apiErrorHandler'
 
 export default function RegisterPage() {
   const router = useRouter()
   const [formData, setFormData] = useState({
     name: '',
     healthId: '',
-    email: '',
     phone: '',
     password: '',
     confirmPassword: ''
   })
+  const [error, setError] = useState<string | null>(null)
+  const [loadingStates, { startLoading, stopLoading, isLoading }] = useLoadingManager()
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target
     setFormData(prev => ({ ...prev, [id]: value }))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // 注册逻辑将在这里实现
-    console.log('Registration attempt with:', formData)
-    // 临时重定向到仪表板
-    router.push('/dashboard')
+    startLoading('registerUser')
+    setError(null)
+    
+    // Check if passwords match
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match')
+      stopLoading('registerUser')
+      return
+    }
+    
+    try {
+      // Prepare user data according to backend schema
+      const userData = {
+        name: formData.name,
+        health_id: formData.healthId,
+        phone_number: formData.phone,
+        password: formData.password,
+        phone_verified: false
+      };
+      
+      const result = await createUser(userData);
+      console.log('Registration successful:', result)
+      // Redirect to login page after successful registration
+      router.push('/login')
+    } catch (err: any) {
+      console.error('Registration error:', err)
+      setError(getErrorMessage(err))
+    } finally {
+      stopLoading('registerUser')
+    }
   }
 
   return (
@@ -63,17 +93,7 @@ export default function RegisterPage() {
                 required
               />
             </div>
-            <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">Email Address</label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="your.email@example.com"
-                value={formData.email}
-                onChange={handleChange}
-                required
-              />
-            </div>
+            
             <div className="space-y-2">
               <label htmlFor="phone" className="text-sm font-medium">Phone Number</label>
               <Input
@@ -107,10 +127,15 @@ export default function RegisterPage() {
                 required
               />
             </div>
-            <Button type="submit" className="w-full">
-              Create Account
+            <Button type="submit" className="w-full" disabled={isLoading('registerUser')}>
+              {isLoading('registerUser') ? 'Creating Account...' : 'Create Account'}
             </Button>
           </form>
+          {error && (
+            <div className="mt-4 p-3 bg-red-50 text-red-700 rounded-md text-sm">
+              Error: {error}
+            </div>
+          )}
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
               Already have an account?{' '}

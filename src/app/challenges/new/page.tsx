@@ -2,157 +2,169 @@
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { createChallenge } from '@/lib/api'
+import { useLoadingManager } from '@/lib/loadingManager'
+import { getErrorMessage } from '@/lib/apiErrorHandler'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function NewChallengePage() {
+  const { user } = useAuth()
   const router = useRouter()
-  const [formData, setFormData] = useState({
-    title: '',
-    goal: '',
-    startDate: '',
-    endDate: '',
-    inviteEmail: '',
-    invitePhone: ''
-  })
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [goal, setGoal] = useState('')
+  const [participants, setParticipants] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [loadingStates, { startLoading, stopLoading, isLoading }] = useLoadingManager()
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { id, value } = e.target
-    setFormData(prev => ({ ...prev, [id]: value }))
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // 提交挑战逻辑将在这里实现
-    console.log('New challenge:', formData)
-    // 临时重定向到挑战列表
-    router.push('/challenges')
+    
+    // 检查用户是否已登录
+    if (!user) {
+      setError('You must be logged in to create a challenge')
+      return
+    }
+    
+    // 基本验证
+    if (!title || !startDate || !endDate || !goal) {
+      setError('Please fill in all required fields')
+      return
+    }
+    
+    if (new Date(startDate) >= new Date(endDate)) {
+      setError('End date must be after start date')
+      return
+    }
+    
+    try {
+      startLoading('createChallenge')
+      setError(null)
+      
+      // 构造挑战数据
+      const challengeData = {
+        challenge_id: `CH-${Date.now()}`, // 临时ID，实际应由后端生成
+        goal: goal,
+        start_date: startDate,
+        end_date: endDate
+      }
+      
+      // 调用API创建挑战，使用认证上下文中的用户ID
+      const newChallenge = await createChallenge(challengeData, user.id)
+      
+      console.log('Challenge created:', newChallenge)
+      router.push('/challenges')
+    } catch (err: any) {
+      console.error('Failed to create challenge:', err)
+      setError(getErrorMessage(err))
+    } finally {
+      stopLoading('createChallenge')
+    }
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow">
         <div className="container mx-auto px-4 py-6">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-gray-900">Create Wellness Challenge</h1>
-            <Button variant="outline" onClick={() => router.back()}>
-              Cancel
-            </Button>
-          </div>
+          <h1 className="text-2xl font-bold text-gray-900">Create New Challenge</h1>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 max-w-2xl">
-        <Card>
-          <CardHeader>
-            <CardTitle>New Challenge</CardTitle>
-            <CardDescription>
-              Create a wellness challenge to motivate yourself and others
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Challenge Details</h3>
-                
+      <main className="container mx-auto px-4 py-8">
+        <Card className="max-w-2xl mx-auto">
+          <form onSubmit={handleSubmit}>
+            <CardHeader>
+              <CardTitle>Create Challenge</CardTitle>
+              <CardDescription>Set up a new wellness challenge for you and your family</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {error && (
+                <div className="p-3 bg-red-50 text-red-700 rounded-md text-sm">
+                  {error}
+                </div>
+              )}
+              
+              <div className="space-y-2">
+                <Label htmlFor="title">Challenge Title *</Label>
+                <Input 
+                  id="title" 
+                  value={title} 
+                  onChange={(e) => setTitle(e.target.value)} 
+                  placeholder="e.g., 10K Steps Daily" 
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea 
+                  id="description" 
+                  value={description} 
+                  onChange={(e) => setDescription(e.target.value)} 
+                  placeholder="Describe your challenge..." 
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label htmlFor="title" className="text-sm font-medium">
-                    Challenge Title
-                  </label>
-                  <Input
-                    id="title"
-                    placeholder="e.g., Walk 100 Miles in a Month"
-                    value={formData.title}
-                    onChange={handleChange}
+                  <Label htmlFor="startDate">Start Date *</Label>
+                  <Input 
+                    id="startDate" 
+                    type="date" 
+                    value={startDate} 
+                    onChange={(e) => setStartDate(e.target.value)} 
                     required
                   />
                 </div>
-                
                 <div className="space-y-2">
-                  <label htmlFor="goal" className="text-sm font-medium">
-                    Challenge Goal
-                  </label>
-                  <textarea
-                    id="goal"
-                    rows={3}
-                    placeholder="Describe the goal and metrics for success..."
-                    value={formData.goal}
-                    onChange={handleChange}
-                    className="w-full rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  <Label htmlFor="endDate">End Date *</Label>
+                  <Input 
+                    id="endDate" 
+                    type="date" 
+                    value={endDate} 
+                    onChange={(e) => setEndDate(e.target.value)} 
                     required
                   />
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label htmlFor="startDate" className="text-sm font-medium">
-                      Start Date
-                    </label>
-                    <Input
-                      id="startDate"
-                      type="date"
-                      value={formData.startDate}
-                      onChange={handleChange}
-                      required
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label htmlFor="endDate" className="text-sm font-medium">
-                      End Date
-                    </label>
-                    <Input
-                      id="endDate"
-                      type="date"
-                      value={formData.endDate}
-                      onChange={handleChange}
-                      required
-                    />
-                  </div>
-                </div>
               </div>
-              
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Invite Participants</h3>
-                
-                <div className="space-y-2">
-                  <label htmlFor="inviteEmail" className="text-sm font-medium">
-                    Invite by Email (Optional)
-                  </label>
-                  <Input
-                    id="inviteEmail"
-                    type="email"
-                    placeholder="participant@example.com"
-                    value={formData.inviteEmail}
-                    onChange={handleChange}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <label htmlFor="invitePhone" className="text-sm font-medium">
-                    Invite by Phone (Optional)
-                  </label>
-                  <Input
-                    id="invitePhone"
-                    type="tel"
-                    placeholder="(123) 456-7890"
-                    value={formData.invitePhone}
-                    onChange={handleChange}
-                  />
-                </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="goal">Goal *</Label>
+                <Input 
+                  id="goal" 
+                  value={goal} 
+                  onChange={(e) => setGoal(e.target.value)} 
+                  placeholder="e.g., Walk 10,000 steps daily" 
+                  required
+                />
               </div>
-              
-              <div className="flex justify-end gap-3">
-                <Button variant="outline" type="button" onClick={() => router.back()}>
-                  Cancel
-                </Button>
-                <Button type="submit">
-                  Create Challenge
-                </Button>
+
+              <div className="space-y-2">
+                <Label htmlFor="participants">Invite Participants</Label>
+                <Input 
+                  id="participants" 
+                  value={participants} 
+                  onChange={(e) => setParticipants(e.target.value)} 
+                  placeholder="Enter email addresses separated by commas" 
+                />
               </div>
-            </form>
-          </CardContent>
+            </CardContent>
+            <CardFooter className="flex justify-between">
+              <Button type="button" variant="outline" onClick={() => router.back()}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isLoading('createChallenge')}>
+                {isLoading('createChallenge') ? 'Creating...' : 'Create Challenge'}
+              </Button>
+            </CardFooter>
+          </form>
         </Card>
       </main>
     </div>

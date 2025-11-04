@@ -1,0 +1,140 @@
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Table
+from sqlalchemy.orm import relationship, declarative_base
+from datetime import datetime
+from typing import List, Optional
+
+Base = declarative_base()
+
+# Association table for user-email relationships
+user_email_association = Table(
+    'user_emails',
+    Base.metadata,
+    Column('user_id', Integer, ForeignKey('users.id')),
+    Column('email_id', Integer, ForeignKey('emails.id'))
+)
+
+# Association table for user-provider relationships
+user_provider_association = Table(
+    'user_providers',
+    Base.metadata,
+    Column('user_id', Integer, ForeignKey('users.id')),
+    Column('provider_id', Integer, ForeignKey('providers.id'))
+)
+
+# Association table for challenge participants
+challenge_participant_association = Table(
+    'challenge_participants',
+    Base.metadata,
+    Column('challenge_id', Integer, ForeignKey('challenges.id')),
+    Column('user_id', Integer, ForeignKey('users.id'))
+)
+
+# Association table for family group members
+family_group_member_association = Table(
+    'family_group_members',
+    Base.metadata,
+    Column('family_group_id', Integer, ForeignKey('family_groups.id')),
+    Column('user_id', Integer, ForeignKey('users.id'))
+)
+
+class User(Base):
+    __tablename__ = 'users'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    health_id = Column(String, unique=True, index=True)  # Unique health ID like SSN
+    name = Column(String, index=True)
+    phone_number = Column(String)
+    phone_verified = Column(Boolean, default=False)
+    password_hash = Column(String)  # For authentication
+    primary_provider_id = Column(Integer, ForeignKey('providers.id'), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    emails = relationship("Email", secondary=user_email_association, back_populates="users")
+    providers = relationship("Provider", secondary=user_provider_association, back_populates="users")
+    appointments = relationship("Appointment", back_populates="user")
+    challenges_created = relationship("Challenge", foreign_keys='Challenge.creator_id')
+    challenges_participating = relationship("Challenge", secondary=challenge_participant_association, back_populates="participants")
+    family_groups = relationship("FamilyGroup", secondary=family_group_member_association, back_populates="members")
+    
+class Email(Base):
+    __tablename__ = 'emails'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    email_address = Column(String, unique=True, index=True)
+    verified = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    users = relationship("User", secondary=user_email_association, back_populates="emails")
+
+class Provider(Base):
+    __tablename__ = 'providers'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    license_number = Column(String, unique=True, index=True)  # Unique medical license number
+    name = Column(String, index=True)
+    specialty = Column(String)
+    verified = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    users = relationship("User", secondary=user_provider_association, back_populates="providers")
+    appointments = relationship("Appointment", back_populates="provider")
+
+class Appointment(Base):
+    __tablename__ = 'appointments'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    appointment_id = Column(String, unique=True, index=True)  # Unique appointment ID
+    user_id = Column(Integer, ForeignKey('users.id'))
+    provider_id = Column(Integer, ForeignKey('providers.id'))
+    date_time = Column(DateTime)
+    consultation_type = Column(String)  # "in-person" or "online"
+    notes = Column(String, nullable=True)
+    cancelled = Column(Boolean, default=False)
+    cancellation_reason = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User", back_populates="appointments")
+    provider = relationship("Provider", back_populates="appointments")
+
+class Challenge(Base):
+    __tablename__ = 'challenges'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    challenge_id = Column(String, unique=True, index=True)  # Unique challenge ID
+    creator_id = Column(Integer, ForeignKey('users.id'), nullable=True)
+    goal = Column(String)  # Challenge goal (e.g., "Walk 100 miles in a month")
+    start_date = Column(DateTime)
+    end_date = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    creator = relationship("User", foreign_keys=[creator_id])
+    participants = relationship("User", secondary=challenge_participant_association, back_populates="challenges_participating")
+
+class FamilyGroup(Base):
+    __tablename__ = 'family_groups'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    members = relationship("User", secondary=family_group_member_association, back_populates="family_groups")
+
+class Invitation(Base):
+    __tablename__ = 'invitations'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    sender_id = Column(Integer, ForeignKey('users.id'))
+    recipient_email = Column(String, nullable=True)  # For unregistered users
+    recipient_phone = Column(String, nullable=True)  # For unregistered users
+    invitation_type = Column(String)  # "challenge" or "data_sharing"
+    sent_at = Column(DateTime, default=datetime.utcnow)
+    accepted_at = Column(DateTime, nullable=True)
+    expired_at = Column(DateTime, nullable=True)
+    is_accepted = Column(Boolean, default=False)
+    is_expired = Column(Boolean, default=False)

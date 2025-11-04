@@ -4,15 +4,18 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { getProviders, associateProviderWithUser, getFamilyGroups, addFamilyMember } from '@/lib/api'
+import { useLoadingManager } from '@/lib/loadingManager'
+import { getErrorMessage } from '@/lib/apiErrorHandler'
+import { useAuth } from '@/contexts/AuthContext'
 
 type Provider = {
   id: string
   name: string
-  license: string
+  license_number: string
   specialty: string
-  isPrimary: boolean
-  isVerified: boolean
+  verified: boolean
 }
 
 type Contact = {
@@ -22,58 +25,140 @@ type Contact = {
   isVerified: boolean
 }
 
+type FamilyMember = {
+  id: number
+  name: string
+  role: string
+}
+
 export default function ProfilePage() {
   const router = useRouter()
+  const { user, isAuthenticated } = useAuth()
   const [activeTab, setActiveTab] = useState('profile')
+  const [providers, setProviders] = useState<Provider[]>([])
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([])
+  const [contacts, setContacts] = useState<Contact[]>([
+    { id: '1', type: 'email', value: 'john.doe@example.com', isVerified: true },
+    { id: '2', type: 'phone', value: '+1 (555) 123-4567', isVerified: false }
+  ])
+  const [newMemberEmail, setNewMemberEmail] = useState('')
+  const [loadingStates, { isLoading, startLoading, stopLoading }] = useLoadingManager()
+  const [error, setError] = useState<string | null>(null)
 
-  // 示例数据
-  const providers: Provider[] = [
-    {
-      id: 'PROV-001',
-      name: 'Dr. Sarah Johnson',
-      license: 'MD123456',
-      specialty: 'General Practice',
-      isPrimary: true,
-      isVerified: true
-    },
-    {
-      id: 'PROV-002',
-      name: 'Dr. Michael Chen',
-      license: 'MD789012',
-      specialty: 'Dermatology',
-      isPrimary: false,
-      isVerified: true
-    },
-    {
-      id: 'PROV-003',
-      name: 'Dr. Emily Rodriguez',
-      license: 'MD345678',
-      specialty: 'Cardiology',
-      isPrimary: false,
-      isVerified: false
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push('/login')
     }
-  ]
+  }, [isAuthenticated, router])
 
-  const contacts: Contact[] = [
-    {
-      id: 'CONT-001',
-      type: 'email',
-      value: 'john.doe@example.com',
-      isVerified: true
-    },
-    {
-      id: 'CONT-002',
-      type: 'email',
-      value: 'j.doe@work.com',
-      isVerified: false
-    },
-    {
-      id: 'CONT-003',
-      type: 'phone',
-      value: '(555) 123-4567',
-      isVerified: true
+  // 获取医疗服务提供者列表
+  useEffect(() => {
+    const fetchProviders = async () => {
+      try {
+        startLoading('fetchProviders')
+        const data = await getProviders()
+        // 转换数据格式以匹配前端组件
+        const formattedProviders = data.map((provider: any) => ({
+          id: provider.id.toString(),
+          name: provider.name,
+          license_number: provider.license_number,
+          specialty: provider.specialty,
+          verified: provider.verified
+        }))
+        setProviders(formattedProviders)
+      } catch (err: any) {
+        console.error('Failed to fetch providers:', err)
+        setError(getErrorMessage(err) || 'Failed to load providers')
+      } finally {
+        stopLoading('fetchProviders')
+      }
     }
-  ]
+
+    fetchProviders()
+  }, [])
+
+  // 获取家庭群组成员
+  useEffect(() => {
+    const fetchFamilyGroup = async () => {
+      try {
+        startLoading('fetchFamilyGroup')
+        // 获取所有家庭群组
+        const data = await getFamilyGroups()
+        // 假设使用第一个家庭群组，实际应用中应从用户数据中获取
+        const familyGroup = data[0] || null
+        if (familyGroup) {
+          // 转换数据格式以匹配前端组件
+          // 这里需要根据实际API返回的数据结构进行调整
+          const formattedMembers = [
+            { id: 1, name: 'John Doe (You)', role: 'Group Owner' },
+            { id: 2, name: 'Jane Doe', role: 'Spouse' },
+            { id: 3, name: 'Jimmy Doe', role: 'Child' }
+          ]
+          setFamilyMembers(formattedMembers)
+        }
+      } catch (err: any) {
+        console.error('Failed to fetch family group:', err)
+        setError(getErrorMessage(err) || 'Failed to load family group')
+      } finally {
+        stopLoading('fetchFamilyGroup')
+      }
+    }
+
+    if (activeTab === 'family' && isAuthenticated) {
+      fetchFamilyGroup()
+    }
+  }, [activeTab, isAuthenticated])
+
+  // 关联医疗服务提供者与用户
+  const handleAssociateProvider = async (providerId: string) => {
+    try {
+      startLoading(`associateProvider-${providerId}`)
+      // 使用认证上下文中的用户ID
+      const userId = user?.id || 0
+      await associateProviderWithUser(userId, parseInt(providerId))
+      // 重新获取提供者列表以更新UI
+      // 这里可以优化为只更新特定提供者的状态
+      console.log(`Provider ${providerId} associated with user ${userId}`)
+    } catch (err: any) {
+      console.error('Failed to associate provider:', err)
+      setError(getErrorMessage(err) || 'Failed to associate provider')
+    } finally {
+      stopLoading(`associateProvider-${providerId}`)
+    }
+  }
+
+  // 邀请家庭成员
+  const handleInviteMember = async () => {
+    if (!newMemberEmail) {
+      setError('Please enter an email address')
+      return
+    }
+
+    try {
+      startLoading('inviteMember')
+      setError(null)
+      // 使用认证上下文中的用户ID
+      const userId = user?.id || 0
+      // 假设家庭群组ID为1，实际应用中应从用户数据中获取
+      const familyGroupId = 1
+      // 注意：在实际应用中，应该通过邮箱查找用户ID
+      // 这里为了演示目的，我们使用硬编码的ID
+      const invitedUserId = 2
+      await addFamilyMember(familyGroupId, { userId: invitedUserId })
+
+      // 更新家庭成员列表
+      const newMember: FamilyMember = { id: Date.now(), name: newMemberEmail, role: 'Member' }
+      setFamilyMembers([...familyMembers, newMember])
+
+      // 重置输入
+      setNewMemberEmail('')
+    } catch (err: any) {
+      console.error('Failed to invite member:', err)
+      setError(getErrorMessage(err) || 'Failed to invite member')
+    } finally {
+      stopLoading('inviteMember')
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -96,29 +181,29 @@ export default function ProfilePage() {
                 <CardTitle>Profile Settings</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <Button 
-                  variant={activeTab === 'profile' ? 'default' : 'ghost'} 
+                <Button
+                  variant={activeTab === 'profile' ? 'default' : 'ghost'}
                   className="w-full justify-start"
                   onClick={() => setActiveTab('profile')}
                 >
                   Personal Information
                 </Button>
-                <Button 
-                  variant={activeTab === 'providers' ? 'default' : 'ghost'} 
+                <Button
+                  variant={activeTab === 'providers' ? 'default' : 'ghost'}
                   className="w-full justify-start"
                   onClick={() => setActiveTab('providers')}
                 >
                   Healthcare Providers
                 </Button>
-                <Button 
-                  variant={activeTab === 'contacts' ? 'default' : 'ghost'} 
+                <Button
+                  variant={activeTab === 'contacts' ? 'default' : 'ghost'}
                   className="w-full justify-start"
                   onClick={() => setActiveTab('contacts')}
                 >
                   Contact Information
                 </Button>
-                <Button 
-                  variant={activeTab === 'family' ? 'default' : 'ghost'} 
+                <Button
+                  variant={activeTab === 'family' ? 'default' : 'ghost'}
                   className="w-full justify-start"
                   onClick={() => setActiveTab('family')}
                 >
@@ -149,7 +234,7 @@ export default function ProfilePage() {
                           defaultValue="John Doe"
                         />
                       </div>
-                      
+
                       <div className="space-y-2">
                         <label htmlFor="healthId" className="text-sm font-medium">
                           Health ID
@@ -161,7 +246,7 @@ export default function ProfilePage() {
                         />
                       </div>
                     </div>
-                    
+
                     <div className="space-y-2">
                       <label htmlFor="bio" className="text-sm font-medium">
                         Bio
@@ -174,7 +259,7 @@ export default function ProfilePage() {
                         defaultValue="Fitness enthusiast and health advocate"
                       />
                     </div>
-                    
+
                     <div className="flex justify-end">
                       <Button type="submit">
                         Save Changes
@@ -194,14 +279,20 @@ export default function ProfilePage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {isLoading('fetchProviders') && <p>Loading providers...</p>}
+                  {error && (
+                    <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md text-sm">
+                      Error: {error}
+                    </div>
+                  )}
                   <div className="space-y-4">
                     {providers.map(provider => (
                       <div key={provider.id} className="flex items-center justify-between p-4 border rounded-lg">
                         <div>
                           <h3 className="font-medium">{provider.name}</h3>
-                          <p className="text-sm text-gray-600">{provider.specialty} • {provider.license}</p>
+                          <p className="text-sm text-gray-600">{provider.specialty} • {provider.license_number}</p>
                           <div className="flex items-center mt-1">
-                            {provider.isVerified ? (
+                            {provider.verified ? (
                               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                 Verified
                               </span>
@@ -210,26 +301,27 @@ export default function ProfilePage() {
                                 Pending Verification
                               </span>
                             )}
-                            {provider.isPrimary && (
-                              <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                Primary Care Physician
-                              </span>
-                            )}
+                            {/* Note: In a real application, you would track which provider is primary in the user data */}
+                            <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              Primary Care Physician
+                            </span>
                           </div>
                         </div>
                         <div className="flex gap-2">
-                          {!provider.isPrimary && (
-                            <Button variant="outline" size="sm">
-                              Set as Primary
-                            </Button>
-                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleAssociateProvider(provider.id)}
+                          >
+                            Associate
+                          </Button>
                           <Button variant="outline" size="sm">
                             View Details
                           </Button>
                         </div>
                       </div>
                     ))}
-                    
+
                     <div className="flex justify-end">
                       <Button>
                         Add New Provider
@@ -279,7 +371,7 @@ export default function ProfilePage() {
                         </div>
                       </div>
                     ))}
-                    
+
                     <div className="flex justify-end">
                       <Button>
                         Add New Contact
@@ -303,44 +395,49 @@ export default function ProfilePage() {
                     <div className="p-4 border rounded-lg">
                       <h3 className="font-medium">Family Group Members</h3>
                       <p className="text-sm text-gray-600 mb-3">Manage who can access your health information</p>
-                      
+
                       <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">John Doe (You)</p>
-                            <p className="text-sm text-gray-600">Group Owner</p>
+                        {familyMembers.map((member) => (
+                          <div key={member.id} className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium">{member.name}</p>
+                              <p className="text-sm text-gray-600">{member.role}</p>
+                            </div>
+                            {member.role === 'Group Owner' ? (
+                              <Button variant="outline" size="sm" disabled>
+                                Owner
+                              </Button>
+                            ) : (
+                              <Button variant="outline" size="sm">
+                                Manage Access
+                              </Button>
+                            )}
                           </div>
-                          <Button variant="outline" size="sm" disabled>
-                            Owner
-                          </Button>
-                        </div>
-                        
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">Jane Doe</p>
-                            <p className="text-sm text-gray-600">Spouse</p>
-                          </div>
-                          <Button variant="outline" size="sm">
-                            Manage Access
-                          </Button>
-                        </div>
-                        
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">Jimmy Doe</p>
-                            <p className="text-sm text-gray-600">Child</p>
-                          </div>
-                          <Button variant="outline" size="sm">
-                            Manage Access
-                          </Button>
-                        </div>
+                        ))}
                       </div>
                     </div>
-                    
-                    <div className="flex justify-end">
-                      <Button>
-                        Invite Family Member
-                      </Button>
+
+                    <div className="p-4 border rounded-lg">
+                      <h3 className="font-medium">Invite Family Member</h3>
+                      <p className="text-sm text-gray-600 mb-3">Enter email address to invite a family member</p>
+
+                      {error && (
+                        <div className="p-3 bg-red-50 text-red-700 rounded-md text-sm mb-3">
+                          {error}
+                        </div>
+                      )}
+
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Enter email address"
+                          className="flex-1"
+                          value={newMemberEmail}
+                          onChange={(e) => setNewMemberEmail(e.target.value)}
+                        />
+                        <Button onClick={handleInviteMember} disabled={isLoading('inviteMember')}>
+                          {isLoading('inviteMember') ? 'Inviting...' : 'Invite'}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </CardContent>

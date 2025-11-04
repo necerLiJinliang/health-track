@@ -2,11 +2,19 @@
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createAppointment, getProviders } from '@/lib/api'
+import { useLoadingManager } from '@/lib/loadingManager'
+import { getErrorMessage } from '@/lib/apiErrorHandler'
+import { Provider } from '@/types'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function NewAppointmentPage() {
+  const { user } = useAuth()
   const router = useRouter()
   const [formData, setFormData] = useState({
     providerLicense: '',
@@ -16,18 +24,56 @@ export default function NewAppointmentPage() {
     type: 'in-person',
     notes: ''
   })
+  const [error, setError] = useState<string | null>(null)
+  const [loadingStates, { startLoading, stopLoading, isLoading }] = useLoadingManager()
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { id, value } = e.target
     setFormData(prev => ({ ...prev, [id]: value }))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // 提交预约逻辑将在这里实现
-    console.log('New appointment:', formData)
-    // 临时重定向到预约列表
-    router.push('/appointments')
+    
+    // 检查用户是否已登录
+    if (!user) {
+      setError('You must be logged in to create an appointment')
+      return
+    }
+    
+    // 验证表单数据
+    if (!formData.providerLicense || !formData.date || !formData.time) {
+      setError('Please fill in all required fields')
+      return
+    }
+    
+    try {
+      startLoading('createAppointment')
+      setError(null)
+      
+      // 构造预约数据
+      const appointmentData = {
+        appointment_id: `APT-${Date.now()}`, // 生成唯一的预约ID
+        provider_id: parseInt(formData.providerLicense), // 这里应该通过许可证号查找提供者ID
+        date_time: new Date(`${formData.date}T${formData.time}`).toISOString(),
+        consultation_type: formData.type,
+        notes: formData.notes || null
+      }
+      
+      // 使用认证上下文中的用户ID
+      const userId = user.id
+      
+      // 调用API创建预约
+      await createAppointment(appointmentData, userId)
+      
+      // 重定向到预约列表页面
+      router.push('/appointments')
+    } catch (err: any) {
+      console.error('Failed to create appointment:', err)
+      setError(getErrorMessage(err))
+    } finally {
+      stopLoading('createAppointment')
+    }
   }
 
   return (
@@ -52,6 +98,11 @@ export default function NewAppointmentPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md text-sm">
+                Error: {error}
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Provider Information</h3>
@@ -65,6 +116,7 @@ export default function NewAppointmentPage() {
                     placeholder="Enter provider license number"
                     value={formData.providerLicense}
                     onChange={handleChange}
+                    required
                   />
                 </div>
                 
@@ -156,8 +208,8 @@ export default function NewAppointmentPage() {
                 <Button variant="outline" type="button" onClick={() => router.back()}>
                   Cancel
                 </Button>
-                <Button type="submit">
-                  Book Appointment
+                <Button type="submit" disabled={isLoading('createAppointment')}>
+                  {isLoading('createAppointment') ? 'Booking...' : 'Book Appointment'}
                 </Button>
               </div>
             </form>
