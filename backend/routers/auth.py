@@ -28,10 +28,10 @@ class Token(schemas.BaseModel):
     token_type: str
 
 class TokenData(schemas.BaseModel):
-    health_id: Optional[str] = None
+    phone_number: Optional[str] = None
 
 class LoginRequest(schemas.BaseModel):
-    email: str  # Using health_id as email for simplicity
+    phone_number: str  # Using phone number for login
     password: str
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -52,31 +52,30 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_
     )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        health_id: str = payload.get("sub")
-        if health_id is None:
+        phone_number: str = payload.get("sub")
+        if phone_number is None:
             raise credentials_exception
-        token_data = TokenData(health_id=health_id)
+        token_data = TokenData(phone_number=phone_number)
     except JWTError:
         raise credentials_exception
-    user = crud.get_user_by_health_id(db, health_id=token_data.health_id)
+    user = crud.get_user_by_phone_number(db, phone_number=token_data.phone_number)
     if user is None:
         raise credentials_exception
     return user
 
 @router.post("/login", response_model=Token)
 def login_for_access_token(login_request: LoginRequest, db: Session = Depends(get_db)):
-    # For now, we're using health_id as email for simplicity
-    # In a real application, you would have a separate email field
-    user = crud.authenticate_user(db, login_request.email, login_request.password)
+    # Using phone number for login
+    user = crud.authenticate_user(db, login_request.phone_number, login_request.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail="Incorrect phone number or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.health_id}, expires_delta=access_token_expires
+        data={"sub": user.phone_number}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
 

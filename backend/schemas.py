@@ -45,6 +45,12 @@ class UserCreateWithPassword(UserBase):
 class UserCreate(UserBase):
     pass
 
+class UserRegister(BaseModel):
+    name: str
+    phone_number: Optional[str] = None
+    phone_verified: bool = False
+    password: str
+
 class User(UserBase):
     id: int
     primary_provider_id: Optional[int] = None
