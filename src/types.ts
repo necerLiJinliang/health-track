@@ -6,8 +6,15 @@ export interface User {
   phone_verified: boolean;
   primary_provider_id: number | null;
   created_at: string;
-  emails: any[];
-  providers: any[];
+  emails: string[];
+  providers: Provider[];
+}
+
+export interface Email {
+  id: number;
+  email_address: string;
+  verified: boolean;
+  created_at: string;
 }
 
 export interface Provider {
@@ -41,7 +48,7 @@ export interface Challenge {
   start_date: string;
   end_date: string;
   created_at: string;
-  participants: any[];
+  participants: User[];
 }
 
 export interface FamilyGroup {

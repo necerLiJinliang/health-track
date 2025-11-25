@@ -29,10 +29,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const login = async (healthId: string, password: string): Promise<void> => {
+  const login = async (phoneNumber: string, password: string): Promise<void> => {
     try {
       // 调用实际的登录API
-      const tokenData = await loginApi(healthId, password);
+      const tokenData = await loginApi(phoneNumber, password);
       
       // 获取用户信息
       // 注意：loginApi已经设置了authToken cookies，这里不需要重复设置

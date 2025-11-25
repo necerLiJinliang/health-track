@@ -13,7 +13,6 @@ export default function RegisterPage() {
   const router = useRouter()
   const [formData, setFormData] = useState({
     name: '',
-    healthId: '',
     phone: '',
     password: '',
     confirmPassword: ''
@@ -42,7 +41,6 @@ export default function RegisterPage() {
       // Prepare user data according to backend schema
       const userData = {
         name: formData.name,
-        health_id: formData.healthId,
         phone_number: formData.phone,
         password: formData.password,
         phone_verified: false
@@ -54,7 +52,12 @@ export default function RegisterPage() {
       router.push('/login')
     } catch (err: any) {
       console.error('Registration error:', err)
-      setError(getErrorMessage(err))
+      // 更详细地处理错误信息
+      if (err instanceof Error) {
+        setError(err.message || 'An unknown error occurred during registration')
+      } else {
+        setError(getErrorMessage(err) || 'An unknown error occurred during registration')
+      }
     } finally {
       stopLoading('registerUser')
     }
@@ -82,18 +85,6 @@ export default function RegisterPage() {
                 required
               />
             </div>
-            <div className="space-y-2">
-              <label htmlFor="healthId" className="text-sm font-medium">Health ID</label>
-              <Input
-                id="healthId"
-                type="text"
-                placeholder="Unique Health Identifier"
-                value={formData.healthId}
-                onChange={handleChange}
-                required
-              />
-            </div>
-            
             <div className="space-y-2">
               <label htmlFor="phone" className="text-sm font-medium">Phone Number</label>
               <Input

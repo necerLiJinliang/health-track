@@ -5,7 +5,7 @@ const API_BASE_URL = "http://localhost:8000";
 
 // 登录API
 export const login = async (
-  healthId: string,
+  phoneNumber: string,
   password: string,
 ): Promise<{ access_token: string }> => {
   const response = await fetch(`${API_BASE_URL}/auth/login`, {
@@ -13,7 +13,7 @@ export const login = async (
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ email: healthId, password }), // 使用healthId作为email字段
+    body: JSON.stringify({ phone_number: phoneNumber, password }), // 使用手机号字段
   });
 
   if (!response.ok) {

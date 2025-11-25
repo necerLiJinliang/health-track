@@ -10,24 +10,31 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
-  const [healthId, setHealthId] = useState("");
+  const { login, isAuthenticated } = useAuth();
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+
+  // 如果用户已经认证，直接跳转到仪表板
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push("/dashboard");
+    }
+  }, [isAuthenticated, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await login(healthId, password);
+      await login(phoneNumber, password);
       router.push("/dashboard");
     } catch (err) {
       console.error("Login failed:", err);
-      setError("Invalid health ID or password. Please try again.");
+      setError("Invalid phone number or password. Please try again.");
     }
   };
 
@@ -36,7 +43,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
-          <CardDescription>Sign in to your HealthTrack account</CardDescription>
+          <CardDescription>Sign in to your HealthTrack account using your phone number</CardDescription>
         </CardHeader>
         <CardContent>
           {error && (
@@ -46,15 +53,15 @@ export default function LoginPage() {
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <label htmlFor="healthId" className="text-sm font-medium">
-                Health ID
+              <label htmlFor="phoneNumber" className="text-sm font-medium">
+                Phone Number
               </label>
               <Input
-                id="healthId"
-                type="text"
-                placeholder="Your Health ID"
-                value={healthId}
-                onChange={(e) => setHealthId(e.target.value)}
+                id="phoneNumber"
+                type="tel"
+                placeholder="Your Phone Number"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
                 required
               />
             </div>

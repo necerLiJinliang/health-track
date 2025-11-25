@@ -1,32 +1,49 @@
-'use client'
+"use client";
 
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
-import { useAuth } from '@/contexts/AuthContext'
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useInsertionEffect, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { getUserAppointments } from "@/lib/api";
+import { Appointment } from "@/types";
 
 export default function DashboardPage() {
-  const router = useRouter()
-  const { isAuthenticated } = useAuth()
+  const router = useRouter();
+  const { user, isAuthenticated } = useAuth();
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
 
   useEffect(() => {
     if (!isAuthenticated) {
-      router.push('/login')
+      router.push("/login");
     }
-  }, [isAuthenticated, router])
+  }, [isAuthenticated, router]);
+
+  const fetchAppointments = useCallback(async () => {
+    const appointmentsList = await getUserAppointments(user?.id || 0);
+    setAppointments(appointmentsList);
+  }, [user]);
+
+  useEffect(() => {
+    fetchAppointments();
+  }, [user]);
 
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow">
         <div className="container mx-auto px-4 py-6">
           <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-gray-900">HealthTrack Dashboard</h1>
+            <h1 className="text-2xl font-bold text-gray-900">
+              HealthTrack Dashboard
+            </h1>
             <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                onClick={() => router.push('/profile')}
-              >
+              <Button variant="outline" onClick={() => router.push("/profile")}>
                 Profile
               </Button>
             </div>
@@ -38,25 +55,48 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           <Card className="border-blue-100 shadow">
             <CardHeader>
-              <CardTitle className="text-blue-600">Upcoming Appointments</CardTitle>
+              <CardTitle className="text-blue-600">
+                Upcoming Appointments
+              </CardTitle>
               <CardDescription>Next 7 days</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="border-l-4 border-blue-500 pl-4 py-1">
-                  <h3 className="font-medium">Dr. Sarah Johnson</h3>
-                  <p className="text-sm text-gray-600">Annual Checkup</p>
-                  <p className="text-sm">Tomorrow, 10:30 AM</p>
-                </div>
-                <div className="border-l-4 border-green-500 pl-4 py-1">
-                  <h3 className="font-medium">Dr. Michael Chen</h3>
-                  <p className="text-sm text-gray-600">Dermatology</p>
-                  <p className="text-sm">Wed, June 12, 2:00 PM</p>
-                </div>
-                <Button 
-                  variant="outline" 
+                {appointments.length === 0 ? (
+                  <div className="text-gray-500 text-sm">
+                    No upcoming appointments.
+                  </div>
+                ) : (
+                  appointments.map((appointment, idx) => (
+                    <div
+                      key={appointment.id || idx}
+                      className={`border-l-4 ${
+                        idx % 2 === 0 ? "border-blue-500" : "border-green-500"
+                      } pl-4 py-1`}
+                    >
+                      <h3 className="font-medium">{appointment.doctorName}</h3>
+                      <p className="text-sm text-gray-600">
+                        {appointment.type}
+                      </p>
+                      <p className="text-sm">
+                        {new Date(appointment.dateTime).toLocaleString(
+                          "en-US",
+                          {
+                            weekday: "short",
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          },
+                        )}
+                      </p>
+                    </div>
+                  ))
+                )}
+                <Button
+                  variant="outline"
                   className="w-full"
-                  onClick={() => router.push('/appointments')}
+                  onClick={() => router.push("/appointments")}
                 >
                   View All Appointments
                 </Button>
@@ -66,7 +106,9 @@ export default function DashboardPage() {
 
           <Card className="border-green-100 shadow">
             <CardHeader>
-              <CardTitle className="text-green-600">Active Challenges</CardTitle>
+              <CardTitle className="text-green-600">
+                Active Challenges
+              </CardTitle>
               <CardDescription>Ongoing wellness goals</CardDescription>
             </CardHeader>
             <CardContent>
@@ -81,10 +123,10 @@ export default function DashboardPage() {
                   <p className="text-sm text-gray-600">Personal Challenge</p>
                   <p className="text-sm">7 days remaining</p>
                 </div>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full"
-                  onClick={() => router.push('/challenges')}
+                  onClick={() => router.push("/challenges")}
                 >
                   View All Challenges
                 </Button>
@@ -137,7 +179,9 @@ export default function DashboardPage() {
                   </div>
                   <div>
                     <h3 className="font-medium">Appointment Scheduled</h3>
-                    <p className="text-sm text-gray-600">Dermatology checkup with Dr. Chen</p>
+                    <p className="text-sm text-gray-600">
+                      Dermatology checkup with Dr. Chen
+                    </p>
                     <p className="text-xs text-gray-500">2 hours ago</p>
                   </div>
                 </div>
@@ -147,7 +191,9 @@ export default function DashboardPage() {
                   </div>
                   <div>
                     <h3 className="font-medium">Challenge Progress</h3>
-                    <p className="text-sm text-gray-600">10K Steps Daily - 85% complete</p>
+                    <p className="text-sm text-gray-600">
+                      10K Steps Daily - 85% complete
+                    </p>
                     <p className="text-xs text-gray-500">1 day ago</p>
                   </div>
                 </div>
@@ -157,7 +203,9 @@ export default function DashboardPage() {
                   </div>
                   <div>
                     <h3 className="font-medium">Report Generated</h3>
-                    <p className="text-sm text-gray-600">Monthly Health Summary</p>
+                    <p className="text-sm text-gray-600">
+                      Monthly Health Summary
+                    </p>
                     <p className="text-xs text-gray-500">3 days ago</p>
                   </div>
                 </div>
@@ -171,32 +219,32 @@ export default function DashboardPage() {
               <CardDescription>Common tasks and shortcuts</CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-4">
-              <Button 
+              <Button
                 className="h-24 flex flex-col justify-center items-center"
-                onClick={() => router.push('/appointments/new')}
+                onClick={() => router.push("/appointments/new")}
               >
                 <span className="text-lg">📅</span>
                 <span className="mt-2">Book Appointment</span>
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="h-24 flex flex-col justify-center items-center"
-                onClick={() => router.push('/challenges/new')}
+                onClick={() => router.push("/challenges/new")}
               >
                 <span className="text-lg">🏆</span>
                 <span className="mt-2">Create Challenge</span>
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="h-24 flex flex-col justify-center items-center"
               >
                 <span className="text-lg">📊</span>
                 <span className="mt-2">View Reports</span>
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="h-24 flex flex-col justify-center items-center"
-                onClick={() => router.push('/profile')}
+                onClick={() => router.push("/profile")}
               >
                 <span className="text-lg">👤</span>
                 <span className="mt-2">My Profile</span>
@@ -206,5 +254,5 @@ export default function DashboardPage() {
         </div>
       </main>
     </div>
-  )
+  );
 }
