@@ -27,6 +27,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { AddProviderModal } from "@/components/AddProviderModal";
 import { EditPhoneModal } from "@/components/EditPhoneModal";
 import { AddEmailModal } from "@/components/AddEmailModal";
+import { ProviderAvailabilityManager } from "@/components/ProviderAvailabilityManager";
 import type { User, Email } from "@/types";
 
 type Provider = {
@@ -55,6 +56,7 @@ export default function ProfilePage() {
   const { user, isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState("profile");
   const [providers, setProviders] = useState<Provider[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
   const [userInfo, setUserInfo] = useState<User>({} as User);
   const [userEmails, setUserEmails] = useState<Email[]>([]);
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
@@ -394,21 +396,28 @@ export default function ProfilePage() {
                             </div>
                           </div>
                           <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                handleDissociateProvider(provider.id)
-                              }
-                              disabled={isLoading(
-                                `dissociateProvider-${provider.id}`,
-                              )}
-                            >
-                              {isLoading(`dissociateProvider-${provider.id}`)
-                                ? "Deleting..."
-                                : "Delete"}
-                            </Button>
-                          </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelectedProvider(provider)}
+                      >
+                        Manage Availability
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          handleDissociateProvider(provider.id)
+                        }
+                        disabled={isLoading(
+                          `dissociateProvider-${provider.id}`,
+                        )}
+                      >
+                        {isLoading(`dissociateProvider-${provider.id}`)
+                          ? "Deleting..."
+                          : "Delete"}
+                      </Button>
+                    </div>
                         </div>
                       ))
                     ) : (
@@ -427,6 +436,17 @@ export default function ProfilePage() {
                         Add New Provider
                       </Button>
                     </div>
+                    
+                    {selectedProvider && (
+                      <div className="mt-6">
+                        <ProviderAvailabilityManager 
+                          provider={selectedProvider} 
+                          onAvailabilityUpdate={() => {
+                            // 可以在这里添加任何需要在更新可用性时执行的逻辑
+                          }} 
+                        />
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

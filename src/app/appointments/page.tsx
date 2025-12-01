@@ -5,10 +5,13 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { getUserAppointments } from '@/lib/api'
+import { getUserAppointments, getAssociatedProvider, getAllProvidersAvailableSlots } from '@/lib/api'
 import { useLoadingManager } from '@/lib/loadingManager'
 import { getErrorMessage } from '@/lib/apiErrorHandler'
 import { useAuth } from '@/contexts/AuthContext'
+import { Provider } from '@/types'
+import { ProviderAvailabilityManager } from '@/components/ProviderAvailabilityManager'
+import { ProviderAvailabilityModal } from '@/components/ProviderAvailabilityModal'
 
 type Appointment = {
   id: number
@@ -37,6 +40,10 @@ export default function AppointmentsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [filteredAppointments, setFilteredAppointments] = useState<Appointment[]>([])
+  const [providers, setProviders] = useState<Provider[]>([])
+  const [availableSlots, setAvailableSlots] = useState<any[]>([])
+  const [showAvailableSlots, setShowAvailableSlots] = useState(false)
+  // 移除了selectedProvider状态，因为现在使用模态框方式
   const [error, setError] = useState<string | null>(null)
   const [loadingStates, { isLoading, startLoading, stopLoading }] = useLoadingManager()
 
@@ -45,6 +52,45 @@ export default function AppointmentsPage() {
       router.push('/login')
     }
   }, [isAuthenticated, router])
+
+  // 获取关联的Providers
+  const fetchProviders = async () => {
+    try {
+      startLoading("fetchProviders");
+      // 使用认证上下文中的用户ID
+      const userId = user?.id || 0;
+      const data = await getAssociatedProvider(userId);
+      // 转换数据格式以匹配前端组件
+      const formattedProviders = data.map((provider: any) => ({
+        id: provider.id,
+        name: provider.name,
+        license_number: provider.license_number,
+        specialty: provider.specialty,
+        verified: provider.verified,
+      }));
+      setProviders(formattedProviders);
+    } catch (err: any) {
+      console.error("Failed to fetch providers:", err);
+      setError(getErrorMessage(err) || "Failed to load providers");
+    } finally {
+      stopLoading("fetchProviders");
+    }
+  };
+
+  // 获取所有Providers的可用时间段
+  const fetchAllProvidersAvailableSlots = async () => {
+    try {
+      startLoading("fetchAllSlots");
+      const slots = await getAllProvidersAvailableSlots();
+      setAvailableSlots(slots);
+      setShowAvailableSlots(true);
+    } catch (err: any) {
+      console.error("Failed to fetch available slots:", err);
+      setError(getErrorMessage(err) || "Failed to load available slots");
+    } finally {
+      stopLoading("fetchAllSlots");
+    }
+  };
 
   // 获取预约列表
   useEffect(() => {
@@ -66,6 +112,7 @@ export default function AppointmentsPage() {
 
     if (isAuthenticated) {
       fetchAppointments()
+      fetchProviders()
     }
   }, [isAuthenticated, user])
 
@@ -143,7 +190,7 @@ export default function AppointmentsPage() {
         <div className="container mx-auto px-4 py-6">
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold text-gray-900">Appointments</h1>
-            <Button onClick={() => router.push('/appointments/new')}>
+            <Button onClick={fetchAllProvidersAvailableSlots}>
               Book New Appointment
             </Button>
           </div>
@@ -151,6 +198,126 @@ export default function AppointmentsPage() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
+        {/* Providers Section */}
+        <div className="mb-8">
+          <Card>
+            <CardHeader>
+              <CardTitle>Healthcare Providers</CardTitle>
+              <CardDescription>
+                Manage your healthcare providers and set availability schedules
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading("fetchProviders") && <p>Loading providers...</p>}
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md text-sm">
+                  Error: {error}
+                </div>
+              )}
+              <div className="space-y-4">
+                {providers.length > 0 ? (
+                  providers.map((provider) => (
+                    <div 
+                      key={provider.id} 
+                      className="flex items-center justify-between p-4 border rounded-lg"
+                    >
+                      <div>
+                        <h3 className="font-medium">{provider.name}</h3>
+                        <p className="text-sm text-gray-600">
+                          License: {provider.license_number}
+                        </p>
+                        {provider.specialty && (
+                          <p className="text-sm text-gray-600">
+                            Specialty: {provider.specialty}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <ProviderAvailabilityModal 
+                          provider={provider} 
+                          onAvailabilityUpdate={() => {
+                            // 可以在这里添加任何需要在更新可用性时执行的逻辑
+                          }}
+                        >
+                          <Button variant="outline" size="sm">
+                            Manage Availability
+                          </Button>
+                        </ProviderAvailabilityModal>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">
+                      You haven't associated any healthcare providers yet.
+                    </p>
+                    <p className="text-gray-500 mt-2">
+                      Please associate providers in your profile to manage their availability.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+          
+          
+        </div>
+
+        {/* Available Slots Section */}
+        {showAvailableSlots && (
+          <div className="mb-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Available Time Slots</CardTitle>
+                <CardDescription>
+                  Select a time slot to book your appointment
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading("fetchAllSlots") && <p>Loading available slots...</p>}
+                {error && (
+                  <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md text-sm">
+                    Error: {error}
+                  </div>
+                )}
+                <div className="space-y-4">
+                  {availableSlots.length > 0 ? (
+                    availableSlots.map((slot) => (
+                      <div 
+                        key={slot.id} 
+                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                        onClick={() => {
+                          // 跳转到预约页面，并传递选中的时间段信息
+                          router.push(`/appointments/new?slotId=${slot.id}`);
+                        }}
+                      >
+                        <div>
+                          <h3 className="font-medium">
+                            {providers.find(p => p.id === slot.provider_id)?.name || 'Unknown Provider'}
+                          </h3>
+                          <p className="text-sm text-gray-600">
+                            {new Date(slot.start_time).toLocaleString()} - {new Date(slot.end_time).toLocaleString()}
+                          </p>
+                        </div>
+                        <Button size="sm">
+                          Book Appointment
+                        </Button>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-gray-500">
+                        No available time slots found.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Appointments Section */}
         <div className="mb-6">
           <div className="flex gap-4">
             <Input

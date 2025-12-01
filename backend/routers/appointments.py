@@ -26,7 +26,10 @@ def create_appointment(appointment: schemas.AppointmentCreate, user_id: int, db:
     if db_provider is None:
         raise HTTPException(status_code=404, detail="Provider not found")
     
-    return crud.create_appointment(db=db, appointment=appointment, user_id=user_id)
+    try:
+        return crud.create_appointment(db=db, appointment=appointment, user_id=user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/{appointment_id}", response_model=schemas.Appointment)
 def read_appointment(appointment_id: int, db: Session = Depends(get_db)):

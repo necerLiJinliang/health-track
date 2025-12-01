@@ -66,3 +66,12 @@ export interface FamilyMember {
   role: string;
   joined_at: string;
 }
+
+export interface ProviderAvailability {
+  id: number;
+  provider_id: number;
+  start_time: string;
+  end_time: string;
+  is_booked: boolean;
+  created_at: string;
+}

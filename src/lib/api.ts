@@ -16,14 +16,14 @@ const getAuthFetchOptions = (options: RequestInit = {}) => {
     ...options,
     headers: token
       ? {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          ...options.headers,
-        }
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        ...options.headers,
+      }
       : {
-          "Content-Type": "application/json",
-          ...options.headers,
-        },
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
   };
 };
 
@@ -416,12 +416,13 @@ export const getChallengeParticipants = async (challengeId: number) => {
 
 interface FamilyGroupData {
   name: string;
+  owner_id: number;
 }
 
 // Family Group API
-export const createFamilyGroup = async (familyGroupData: FamilyGroupData) => {
+export const createFamilyGroup = async (familyGroupData: FamilyGroupData, userId: number) => {
   const response = await fetch(
-    `${API_BASE_URL}/family_groups/`,
+    `${API_BASE_URL}/family_groups/${userId}`,
     getAuthFetchOptions({
       method: "POST",
       body: JSON.stringify(familyGroupData),
@@ -513,6 +514,92 @@ export const getCurrentUser = async (): Promise<User> => {
 
   if (!response.ok) {
     throw new Error("Failed to fetch user data");
+  }
+
+  return response.json();
+};
+
+// Provider Availability API
+interface ProviderAvailabilityData {
+  provider_id: number;
+  start_time: string;
+  end_time: string;
+  is_booked?: boolean;
+}
+
+export const createProviderAvailability = async (
+  availabilityData: ProviderAvailabilityData
+) => {
+  const response = await fetch(
+    `${API_BASE_URL}/providers-availability/`,
+    getAuthFetchOptions({
+      method: "POST",
+      body: JSON.stringify(availabilityData),
+    })
+  );
+
+  if (!response.ok) {
+    await handleApiError(response);
+  }
+
+  return response.json();
+};
+
+export const getProviderAvailabilities = async (providerId: number) => {
+  const response = await fetch(
+    `${API_BASE_URL}/providers-availability/${providerId}`,
+    getAuthFetchOptions({
+      method: "GET",
+    })
+  );
+
+  if (!response.ok) {
+    await handleApiError(response);
+  }
+
+  return response.json();
+};
+
+export const getAvailableProviderSlots = async (providerId: number) => {
+  const response = await fetch(
+    `${API_BASE_URL}/providers-availability/${providerId}/available`,
+    getAuthFetchOptions({
+      method: "GET",
+    })
+  );
+
+  if (!response.ok) {
+    await handleApiError(response);
+  }
+
+  return response.json();
+};
+
+export const getAllProvidersAvailableSlots = async () => {
+  const response = await fetch(
+    `${API_BASE_URL}/providers-availability/all/available`,
+    getAuthFetchOptions({
+      method: "GET",
+    })
+  );
+
+  if (!response.ok) {
+    await handleApiError(response);
+  }
+
+  return response.json();
+};
+
+export const deleteProviderAvailability = async (availabilityId: number) => {
+  const response = await fetch(
+    `${API_BASE_URL}/providers-availability/${availabilityId}`,
+    getAuthFetchOptions({
+      method: "DELETE",
+    })
+  );
+
+  if (!response.ok) {
+    await handleApiError(response);
   }
 
   return response.json();

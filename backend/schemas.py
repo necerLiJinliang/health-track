@@ -108,10 +108,26 @@ class FamilyGroupBase(BaseModel):
 class FamilyGroupCreate(FamilyGroupBase):
     pass
 
+class FamilyGroupMemberBase(BaseModel):
+    role: str = "member"
+
+class FamilyGroupMemberCreate(FamilyGroupMemberBase):
+    user_id: int
+
+class FamilyGroupMember(FamilyGroupMemberBase):
+    id: int
+    family_group_id: int
+    user_id: int
+    joined_at: datetime
+    
+    class Config:
+        from_attributes = True
+
 class FamilyGroup(FamilyGroupBase):
     id: int
     created_at: datetime
     members: List[User] = []
+    family_group_members: List[FamilyGroupMember] = []
     
     class Config:
         from_attributes = True
@@ -133,6 +149,24 @@ class Invitation(InvitationBase):
     expired_at: Optional[datetime] = None
     is_accepted: bool = False
     is_expired: bool = False
+    
+    class Config:
+        from_attributes = True
+
+
+# Provider Availability schemas
+class ProviderAvailabilityBase(BaseModel):
+    provider_id: int
+    start_time: datetime
+    end_time: datetime
+    is_booked: bool = False
+
+class ProviderAvailabilityCreate(ProviderAvailabilityBase):
+    pass
+
+class ProviderAvailability(ProviderAvailabilityBase):
+    id: int
+    created_at: datetime
     
     class Config:
         from_attributes = True

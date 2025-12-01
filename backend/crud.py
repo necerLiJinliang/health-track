@@ -280,6 +280,23 @@ def get_user_appointments(db: Session, user_id: int):
 def create_appointment(
     db: Session, appointment: schemas.AppointmentCreate, user_id: int
 ):
+    # Check if the appointment time slot is available
+    available_slot = (
+        db.query(models.ProviderAvailability)
+        .filter(
+            and_(
+                models.ProviderAvailability.provider_id == appointment.provider_id,
+                models.ProviderAvailability.start_time <= appointment.date_time,
+                models.ProviderAvailability.end_time > appointment.date_time,
+                models.ProviderAvailability.is_booked == False,
+            )
+        )
+        .first()
+    )
+
+    if not available_slot:
+        raise ValueError("Selected time slot is not available")
+
     db_appointment = models.Appointment(
         appointment_id=appointment.appointment_id,
         user_id=user_id,
@@ -289,6 +306,10 @@ def create_appointment(
         notes=appointment.notes,
     )
     db.add(db_appointment)
+
+    # Mark the availability slot as booked
+    available_slot.is_booked = True
+
     db.commit()
     db.refresh(db_appointment)
     return db_appointment
@@ -360,34 +381,88 @@ def add_participant_to_challenge(db: Session, challenge_id: int, user_id: int):
 
 
 # Family Group CRUD operations
-def get_family_group(db: Session, family_group_id: int):
+def get_family_groups(db: Session):
+    return db.query(models.FamilyGroup).all()
+
+
+def get_family_group_by_id(db: Session, family_group_id: int):
     return (
         db.query(models.FamilyGroup)
+        .options(joinedload(models.FamilyGroup.family_group_members))
         .filter(models.FamilyGroup.id == family_group_id)
         .first()
     )
 
 
-def create_family_group(db: Session, family_group: schemas.FamilyGroupCreate):
-    db_family_group = models.FamilyGroup(name=family_group.name)
+def create_group_member(
+    db: Session, user_id: int, family_group_id: int, role: str = "member"
+):
+    family_group_member = models.FamilyGroupMember(
+        family_group_id=family_group_id, user_id=user_id, role=role
+    )
+    db.add(family_group_member)
+    db.commit()
+    return family_group_member
+
+
+def create_family_group(
+    db: Session, family_group: schemas.FamilyGroupCreate, owner_id: Optional[int] = None
+):
+    db_family_group = models.FamilyGroup(name=family_group.name, owner_id=owner_id)
     db.add(db_family_group)
     db.commit()
     db.refresh(db_family_group)
     return db_family_group
 
 
-def add_member_to_family_group(db: Session, family_group_id: int, user_id: int):
-    family_group = (
-        db.query(models.FamilyGroup)
-        .filter(models.FamilyGroup.id == family_group_id)
+def add_member_to_family_group(
+    db: Session, family_group_id: int, user_id: int, role: str = "member"
+):
+    # Check if the user is already a member
+    existing_member = (
+        db.query(models.FamilyGroupMember)
+        .filter(
+            models.FamilyGroupMember.family_group_id == family_group_id,
+            models.FamilyGroupMember.user_id == user_id,
+        )
         .first()
     )
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    if family_group and user and user not in family_group.members:
-        family_group.members.append(user)
-        db.commit()
-        return True
-    return False
+    if existing_member:
+        return False
+
+    # Create a new family group member record with role
+    family_group_member = models.FamilyGroupMember(
+        family_group_id=family_group_id, user_id=user_id, role=role
+    )
+    db.add(family_group_member)
+    db.commit()
+    return True
+
+
+def get_user_by_phone_number(db: Session, phone_number: str):
+    return (
+        db.query(models.User).filter(models.User.phone_number == phone_number).first()
+    )
+
+
+def get_family_groups_by_user_id(db: Session, user_id: int):
+    """
+    Get all family groups that a user is a member of
+    """
+    user = (
+        db.query(models.User)
+        .options(
+            joinedload(models.User.family_group_memberships).joinedload(
+                models.FamilyGroupMember.family_group
+            )
+        )
+        .filter(models.User.id == user_id)
+        .first()
+    )
+    if user:
+        # Get family groups through family_group_memberships
+        return [membership.family_group for membership in user.family_group_memberships]
+    return []
 
 
 # Invitation CRUD operations
@@ -433,4 +508,98 @@ def accept_invitation(db: Session, invitation_id: int):
             # Mark as expired if past expiration date
             db_invitation.is_expired = True
             db.commit()
+    return False
+
+
+# Provider Availability CRUD operations
+def get_provider_availability(db: Session, availability_id: int):
+    return (
+        db.query(models.ProviderAvailability)
+        .filter(models.ProviderAvailability.id == availability_id)
+        .first()
+    )
+
+
+def get_provider_availabilities(
+    db: Session, provider_id: int, skip: int = 0, limit: int = 100
+):
+    return (
+        db.query(models.ProviderAvailability)
+        .filter(models.ProviderAvailability.provider_id == provider_id)
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+
+def get_available_provider_slots(db: Session, provider_id: int):
+    """Get all available (not booked) time slots for a provider"""
+    return (
+        db.query(models.ProviderAvailability)
+        .filter(
+            and_(
+                models.ProviderAvailability.provider_id == provider_id,
+                models.ProviderAvailability.is_booked == False,
+            )
+        )
+        .all()
+    )
+
+
+def get_all_providers_available_slots(db: Session):
+    """Get all available (not booked) time slots for all providers"""
+    try:
+        result = (
+            db.query(models.ProviderAvailability)
+            .filter(models.ProviderAvailability.is_booked == False)
+            .all()
+        )
+        print(f"Found {len(result)} available slots")
+        return result
+    except Exception as e:
+        print(f"Error in get_all_providers_available_slots: {str(e)}")
+        raise
+
+
+def create_provider_availability(
+    db: Session, availability: schemas.ProviderAvailabilityCreate
+):
+    db_availability = models.ProviderAvailability(
+        provider_id=availability.provider_id,
+        start_time=availability.start_time,
+        end_time=availability.end_time,
+        is_booked=availability.is_booked,
+    )
+    db.add(db_availability)
+    db.commit()
+    db.refresh(db_availability)
+    return db_availability
+
+
+def book_provider_slot(db: Session, availability_id: int):
+    """Mark a provider availability slot as booked"""
+    db_availability = (
+        db.query(models.ProviderAvailability)
+        .filter(models.ProviderAvailability.id == availability_id)
+        .first()
+    )
+    if db_availability and not db_availability.is_booked:
+        db_availability.is_booked = True
+        db.commit()
+        db.refresh(db_availability)
+        return db_availability
+    return None
+
+
+def delete_provider_availability(db: Session, availability_id: int):
+    """Delete a provider availability slot"""
+    db_availability = (
+        db.query(models.ProviderAvailability)
+        .filter(models.ProviderAvailability.id == availability_id)
+        .first()
+    )
+    if db_availability:
+        db.delete(db_availability)
+        db.commit()
+        return True
     return False

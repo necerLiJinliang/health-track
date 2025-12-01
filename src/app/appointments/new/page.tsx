@@ -12,17 +12,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
-import { createAppointment, getAssociatedProvider } from "@/lib/api";
+import { 
+  createAppointment, 
+  getAssociatedProvider, 
+  getAvailableProviderSlots 
+} from "@/lib/api";
 import { useLoadingManager } from "@/lib/loadingManager";
 import { getErrorMessage } from "@/lib/apiErrorHandler";
-import { Provider } from "@/types";
+import { Provider, ProviderAvailability } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function NewAppointmentPage() {
   const { user } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [formData, setFormData] = useState({
     providerLicense: "",
     providerEmail: "",
@@ -31,9 +36,22 @@ export default function NewAppointmentPage() {
     type: "in-person",
     notes: "",
   });
+  const [availableSlots, setAvailableSlots] = useState<ProviderAvailability[]>([]);
+  const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
+  const [showAvailableSlots, setShowAvailableSlots] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingStates, { startLoading, stopLoading, isLoading }] =
     useLoadingManager();
+
+  // 处理从URL传入的时间段ID参数
+  useEffect(() => {
+    const slotId = searchParams.get('slotId');
+    if (slotId) {
+      // 如果有slotId参数，可以在这里处理预选时间段的逻辑
+      // 例如：设置selectedSlot状态或获取时间段详情
+      console.log("Pre-selected slot ID:", slotId);
+    }
+  }, [searchParams]);
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -42,6 +60,21 @@ export default function NewAppointmentPage() {
   ) => {
     const { id, value } = e.target;
     setFormData((prev) => ({ ...prev, [id]: value }));
+  };
+
+  const fetchAvailableSlots = async (providerId: number) => {
+    try {
+      startLoading("fetchSlots");
+      const slots = await getAvailableProviderSlots(providerId);
+      setAvailableSlots(slots);
+      setShowAvailableSlots(true);
+      setError(null);
+    } catch (err: any) {
+      console.error("Failed to fetch available slots:", err);
+      setError(getErrorMessage(err) || "Failed to fetch available slots");
+    } finally {
+      stopLoading("fetchSlots");
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -54,9 +87,31 @@ export default function NewAppointmentPage() {
     }
 
     // 验证表单数据
-    if (!formData.providerLicense || !formData.date || !formData.time) {
-      setError("Please fill in all required fields");
+    if (!formData.providerLicense) {
+      setError("Please enter provider license number");
       return;
+    }
+
+    // 如果选择了可用时间段，则使用该时间段的数据
+    let providerId = parseInt(formData.providerLicense);
+    let appointmentDateTime: string;
+
+    if (selectedSlot !== null) {
+      // 使用选中的可用时间段
+      const slot = availableSlots.find(s => s.id === selectedSlot);
+      if (!slot) {
+        setError("Selected slot is invalid");
+        return;
+      }
+      providerId = slot.provider_id;
+      appointmentDateTime = slot.start_time;
+    } else {
+      // 使用手动输入的时间
+      if (!formData.date || !formData.time) {
+        setError("Please fill in date and time or select from available slots");
+        return;
+      }
+      appointmentDateTime = new Date(`${formData.date}T${formData.time}`).toISOString();
     }
 
     try {
@@ -66,8 +121,8 @@ export default function NewAppointmentPage() {
       // 构造预约数据
       const appointmentData = {
         appointment_id: `APT-${Date.now()}`, // 生成唯一的预约ID
-        provider_id: parseInt(formData.providerLicense), // 这里应该通过许可证号查找提供者ID
-        date_time: new Date(`${formData.date}T${formData.time}`).toISOString(),
+        provider_id: providerId,
+        date_time: appointmentDateTime,
         consultation_type: formData.type,
         notes: formData.notes || null,
       };
@@ -128,13 +183,29 @@ export default function NewAppointmentPage() {
                   >
                     Provider License Number
                   </label>
-                  <Input
-                    id="providerLicense"
-                    placeholder="Enter provider license number"
-                    value={formData.providerLicense}
-                    onChange={handleChange}
-                    required
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      id="providerLicense"
+                      placeholder="Enter provider license number"
+                      value={formData.providerLicense}
+                      onChange={handleChange}
+                      required
+                    />
+                    <Button 
+                      type="button" 
+                      onClick={() => {
+                        const providerId = parseInt(formData.providerLicense);
+                        if (!isNaN(providerId)) {
+                          fetchAvailableSlots(providerId);
+                        } else {
+                          setError("Please enter a valid provider license number");
+                        }
+                      }}
+                      disabled={isLoading("fetchSlots") || !formData.providerLicense}
+                    >
+                      {isLoading("fetchSlots") ? "Loading..." : "Show Available Slots"}
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="relative">
@@ -161,6 +232,46 @@ export default function NewAppointmentPage() {
                     onChange={handleChange}
                   />
                 </div>
+
+                {/* 可用时间段选择 */}
+                {showAvailableSlots && (
+                  <div className="mt-4">
+                    <h4 className="text-md font-medium mb-2">Available Time Slots</h4>
+                    {availableSlots.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {availableSlots.map((slot) => (
+                          <div 
+                            key={slot.id}
+                            className={`p-3 border rounded-md cursor-pointer ${
+                              selectedSlot === slot.id 
+                                ? "border-blue-500 bg-blue-50" 
+                                : "border-gray-300 hover:border-blue-300"
+                            }`}
+                            onClick={() => setSelectedSlot(slot.id)}
+                          >
+                            <div className="font-medium">
+                              {new Date(slot.start_time).toLocaleDateString()} - {new Date(slot.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} to {new Date(slot.end_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-500">No available slots found for this provider.</p>
+                    )}
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm" 
+                      className="mt-2"
+                      onClick={() => {
+                        setShowAvailableSlots(false);
+                        setSelectedSlot(null);
+                      }}
+                    >
+                      Hide Available Slots
+                    </Button>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-4">

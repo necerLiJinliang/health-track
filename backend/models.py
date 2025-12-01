@@ -30,14 +30,6 @@ challenge_participant_association = Table(
     Column("user_id", Integer, ForeignKey("users.id")),
 )
 
-# Association table for family group members
-family_group_member_association = Table(
-    "family_group_members",
-    Base.metadata,
-    Column("family_group_id", Integer, ForeignKey("family_groups.id")),
-    Column("user_id", Integer, ForeignKey("users.id")),
-)
-
 
 class User(Base):
     __tablename__ = "users"
@@ -67,11 +59,8 @@ class User(Base):
         secondary=challenge_participant_association,
         back_populates="participants",
     )
-    family_groups = relationship(
-        "FamilyGroup",
-        secondary=family_group_member_association,
-        back_populates="members",
-    )
+    family_group_memberships = relationship("FamilyGroupMember", back_populates="user")
+    # family_groups relationship is now accessed through family_group_memberships
 
 
 class Email(Base):
@@ -105,6 +94,7 @@ class Provider(Base):
         "User", secondary=user_provider_association, back_populates="providers"
     )
     appointments = relationship("Appointment", back_populates="provider")
+    availabilities = relationship("ProviderAvailability", back_populates="provider")
 
 
 class Appointment(Base):
@@ -152,15 +142,29 @@ class FamilyGroup(Base):
     __tablename__ = "family_groups"
 
     id = Column(Integer, primary_key=True, index=True)
+    owner_id = Column(Integer, ForeignKey("users.id"))
     name = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
-    members = relationship(
-        "User",
-        secondary=family_group_member_association,
-        back_populates="family_groups",
+    # members relationship is now accessed through family_group_members
+    family_group_members = relationship(
+        "FamilyGroupMember", back_populates="family_group"
     )
+
+
+class FamilyGroupMember(Base):
+    __tablename__ = "family_group_members"
+
+    id = Column(Integer, primary_key=True, index=True)
+    family_group_id = Column(Integer, ForeignKey("family_groups.id"))
+    user_id = Column(Integer, ForeignKey("users.id"))
+    role = Column(String, default="member")  # member, caregiver, admin
+    joined_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    family_group = relationship("FamilyGroup", back_populates="family_group_members")
+    user = relationship("User", back_populates="family_group_memberships")
 
 
 class Invitation(Base):
@@ -176,3 +180,17 @@ class Invitation(Base):
     expired_at = Column(DateTime, nullable=True)
     is_accepted = Column(Boolean, default=False)
     is_expired = Column(Boolean, default=False)
+
+
+class ProviderAvailability(Base):
+    __tablename__ = "provider_availabilities"
+
+    id = Column(Integer, primary_key=True, index=True)
+    provider_id = Column(Integer, ForeignKey("providers.id"))
+    start_time = Column(DateTime)
+    end_time = Column(DateTime)
+    is_booked = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    provider = relationship("Provider", back_populates="availabilities")

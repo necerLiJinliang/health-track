@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 from database import engine, Base
-from routers import users, providers, appointments, challenges, family_groups, invitations, auth
+from routers import users, providers, appointments, challenges, family_groups, invitations, auth, providers_availability
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -31,6 +31,7 @@ app.include_router(challenges.router)
 app.include_router(family_groups.router)
 app.include_router(invitations.router)
 app.include_router(auth.router)
+app.include_router(providers_availability.router)
 
 @app.get("/")
 async def root():

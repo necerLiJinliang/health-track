@@ -52,6 +52,9 @@ export default function FamilyGroupPage() {
   const [inviteEmailByGroup, setInviteEmailByGroup] = useState<
     Record<number, string>
   >({});
+  const [invitePhoneByGroup, setInvitePhoneByGroup] = useState<
+    Record<number, string>
+  >({});
   const [inviteRoleByGroup, setInviteRoleByGroup] = useState<
     Record<number, string>
   >({});
@@ -142,7 +145,7 @@ export default function FamilyGroupPage() {
     setCreatingGroup(true);
     setCreateGroupError(null);
     try {
-      const created = await createFamilyGroup({ name: newGroupName.trim() });
+      const created = await createFamilyGroup({ name: newGroupName.trim(), owner_id: user?.id || 0 }, user?.id || 0);
       setFamilyGroups((prev) => [created, ...prev]);
       setNewGroupName("");
       setShowCreateGroupForm(false);
@@ -153,17 +156,20 @@ export default function FamilyGroupPage() {
     }
   };
 
-  const resolveUserByEmail = async (email: string): Promise<number> => {
+  const resolveUserByIdentifier = async (identifier: string, isEmail: boolean): Promise<number> => {
     const token = localStorage.getItem("auth_token");
+    const endpoint = isEmail
+      ? `/family_groups/users/by-email/${encodeURIComponent(identifier)}`
+      : `/family_groups/users/by-phone/${encodeURIComponent(identifier)}`;
     const resp = await fetch(
-      `${process.env.NEXT_PUBLIC_API_BASE_URL}/users/by-email/${encodeURIComponent(email)}`,
+      `${process.env.NEXT_PUBLIC_API_BASE_URL}${endpoint}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       },
     );
-    if (!resp.ok) throw new Error("User not found for given email");
+    if (!resp.ok) throw new Error(`User not found for given ${isEmail ? "email" : "phone number"}`);
     const data = await resp.json();
     return data.id;
   };
@@ -171,21 +177,36 @@ export default function FamilyGroupPage() {
   const handleInviteMember = async (groupId: number, e: FormEvent) => {
     e.preventDefault();
     const email = inviteEmailByGroup[groupId]?.trim();
+    const phone = invitePhoneByGroup[groupId]?.trim();
     const role = inviteRoleByGroup[groupId] || "member";
-    if (!email) {
+
+    // Check if either email or phone is provided
+    if (!email && !phone) {
       setInviteErrorByGroup((prev) => ({
         ...prev,
-        [groupId]: "Email is required",
+        [groupId]: "Either email or phone number is required",
+      }));
+      return;
+    }
+
+    // Check if both email and phone are provided
+    if (email && phone) {
+      setInviteErrorByGroup((prev) => ({
+        ...prev,
+        [groupId]: "Please provide either email or phone number, not both",
       }));
       return;
     }
     setInvitingGroupIds((prev) => new Set(prev).add(groupId));
     setInviteErrorByGroup((prev) => ({ ...prev, [groupId]: null }));
     try {
-      const invitedUserId = await resolveUserByEmail(email);
+      const isEmail = !!email;
+      const identifier = isEmail ? email : phone;
+      const invitedUserId = await resolveUserByIdentifier(identifier!, isEmail);
       await addFamilyMember(groupId, { user_id: invitedUserId, role });
       await fetchGroupMembers(groupId);
       setInviteEmailByGroup((prev) => ({ ...prev, [groupId]: "" }));
+      setInvitePhoneByGroup((prev) => ({ ...prev, [groupId]: "" }));
       setInviteRoleByGroup((prev) => ({ ...prev, [groupId]: "member" }));
     } catch (e: any) {
       setInviteErrorByGroup((prev) => ({
@@ -343,231 +364,252 @@ export default function FamilyGroupPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {loadingGroups && familyGroups.length === 0
             ? Array.from({ length: 3 }).map((_, idx) => (
-                <Card key={idx} className="animate-pulse">
-                  <CardHeader>
-                    <div className="h-6 bg-gray-200 rounded w-1/2" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      <div className="h-4 bg-gray-200 rounded w-3/4" />
-                      <div className="h-4 bg-gray-200 rounded w-1/2" />
-                      <div className="h-28 bg-gray-100 rounded" />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
+              <Card key={idx} className="animate-pulse">
+                <CardHeader>
+                  <div className="h-6 bg-gray-200 rounded w-1/2" />
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="h-4 bg-gray-200 rounded w-3/4" />
+                    <div className="h-4 bg-gray-200 rounded w-1/2" />
+                    <div className="h-28 bg-gray-100 rounded" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))
             : familyGroups.map((group) => {
-                const isExpanded = expandedGroups.has(group.id);
-                const memberState = groupMembers[group.id];
-                const inviteEmail = inviteEmailByGroup[group.id] || "";
-                const inviteRole = inviteRoleByGroup[group.id] || "member";
-                const inviting = invitingGroupIds.has(group.id);
-                const inviteError = inviteErrorByGroup[group.id];
+              const isExpanded = expandedGroups.has(group.id);
+              const memberState = groupMembers[group.id];
+              const inviteEmail = inviteEmailByGroup[group.id] || "";
+              const invitePhone = invitePhoneByGroup[group.id] || "";
+              const inviteRole = inviteRoleByGroup[group.id] || "member";
+              const inviting = invitingGroupIds.has(group.id);
+              const inviteError = inviteErrorByGroup[group.id];
 
-                return (
-                  <Card
-                    key={group.id}
-                    className={cn(
-                      "border-blue-100 shadow transition-all",
-                      isExpanded ? "ring-2 ring-blue-300" : "",
-                    )}
+              return (
+                <Card
+                  key={group.id}
+                  className={cn(
+                    "border-blue-100 shadow transition-all",
+                    isExpanded ? "ring-2 ring-blue-300" : "",
+                  )}
+                >
+                  <CardHeader
+                    className="cursor-pointer"
+                    onClick={() => toggleExpandGroup(group.id)}
                   >
-                    <CardHeader
-                      className="cursor-pointer"
-                      onClick={() => toggleExpandGroup(group.id)}
-                    >
-                      <CardTitle className="flex justify-between items-start">
-                        <span className="text-blue-700">{group.name}</span>
-                        <span className="text-xs font-medium text-blue-500">
-                          {new Date(group.created_at).toLocaleDateString()}
-                        </span>
-                      </CardTitle>
-                      <CardDescription>
-                        {group.members?.length || 0} members
-                      </CardDescription>
-                    </CardHeader>
-                    {isExpanded && (
-                      <CardContent className="space-y-4">
-                        <form
-                          onSubmit={(e) => handleInviteMember(group.id, e)}
-                          className="border rounded p-3 space-y-3 bg-slate-50"
-                        >
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm font-medium text-gray-700">
-                              Invite Member
-                            </span>
-                            <Button size="sm" type="submit" disabled={inviting}>
-                              {inviting ? "Inviting..." : "Send Invite"}
-                            </Button>
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <div className="space-y-1">
-                              <Label htmlFor={`email-${group.id}`}>Email</Label>
-                              <Input
-                                id={`email-${group.id}`}
-                                type="email"
-                                value={inviteEmail}
-                                onChange={(e) =>
-                                  setInviteEmailByGroup((prev) => ({
-                                    ...prev,
-                                    [group.id]: e.target.value,
-                                  }))
-                                }
-                                placeholder="name@example.com"
-                                disabled={inviting}
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <Label htmlFor={`role-${group.id}`}>Role</Label>
-                              <select
-                                id={`role-${group.id}`}
-                                className="w-full border rounded px-2 py-2 text-sm"
-                                value={inviteRole}
-                                disabled={inviting}
-                                onChange={(e) =>
-                                  setInviteRoleByGroup((prev) => ({
-                                    ...prev,
-                                    [group.id]: e.target.value,
-                                  }))
-                                }
-                              >
-                                <option value="member">Member</option>
-                                <option value="caregiver">Caregiver</option>
-                                <option value="admin">Admin</option>
-                              </select>
-                            </div>
-                            <div className="space-y-1">
-                              <Label>Actions</Label>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setInviteEmailByGroup((prev) => ({
-                                    ...prev,
-                                    [group.id]: "",
-                                  }));
-                                  setInviteRoleByGroup((prev) => ({
-                                    ...prev,
-                                    [group.id]: "member",
-                                  }));
-                                  setInviteErrorByGroup((prev) => ({
-                                    ...prev,
-                                    [group.id]: null,
-                                  }));
-                                }}
-                                disabled={inviting}
-                              >
-                                Reset
-                              </Button>
-                            </div>
-                          </div>
-                          {inviteError && (
-                            <div className="text-xs text-red-600 bg-red-50 border border-red-100 p-2 rounded">
-                              {inviteError}
-                            </div>
-                          )}
-                        </form>
-
-                        <Separator className="my-2" />
-
+                    <CardTitle className="flex justify-between items-start">
+                      <span className="text-blue-700">{group.name}</span>
+                      <span className="text-xs font-medium text-blue-500">
+                        {new Date(group.created_at).toLocaleDateString()}
+                      </span>
+                    </CardTitle>
+                    <CardDescription>
+                      {group.members?.length || 0} members
+                    </CardDescription>
+                  </CardHeader>
+                  {isExpanded && (
+                    <CardContent className="space-y-4">
+                      <form
+                        onSubmit={(e) => handleInviteMember(group.id, e)}
+                        className="border rounded p-3 space-y-3 bg-slate-50"
+                      >
                         <div className="flex justify-between items-center">
                           <span className="text-sm font-medium text-gray-700">
-                            Members
+                            Invite Member
                           </span>
-                          <span className="text-xs text-gray-500">
-                            {
-                              (memberState?.members || group.members || [])
-                                .length
-                            }{" "}
-                            total
-                          </span>
+                          <Button size="sm" type="submit" disabled={inviting}>
+                            {inviting ? "Inviting..." : "Send Invite"}
+                          </Button>
                         </div>
-
-                        {memberState?.error && (
-                          <div className="text-xs text-red-600 border border-red-100 bg-red-50 p-2 rounded">
-                            {memberState.error}
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                          <div className="space-y-1">
+                            <Label htmlFor={`email-${group.id}`}>Email</Label>
+                            <Input
+                              id={`email-${group.id}`}
+                              type="email"
+                              value={inviteEmail}
+                              onChange={(e) =>
+                                setInviteEmailByGroup((prev) => ({
+                                  ...prev,
+                                  [group.id]: e.target.value,
+                                }))
+                              }
+                              placeholder="name@example.com"
+                              disabled={inviting}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor={`phone-${group.id}`}>Phone</Label>
+                            <Input
+                              id={`phone-${group.id}`}
+                              type="tel"
+                              value={invitePhone}
+                              onChange={(e) =>
+                                setInvitePhoneByGroup((prev) => ({
+                                  ...prev,
+                                  [group.id]: e.target.value,
+                                }))
+                              }
+                              placeholder="+1234567890"
+                              disabled={inviting}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor={`role-${group.id}`}>Role</Label>
+                            <select
+                              id={`role-${group.id}`}
+                              className="w-full border rounded px-2 py-2 text-sm"
+                              value={inviteRole}
+                              disabled={inviting}
+                              onChange={(e) =>
+                                setInviteRoleByGroup((prev) => ({
+                                  ...prev,
+                                  [group.id]: e.target.value,
+                                }))
+                              }
+                            >
+                              <option value="member">Member</option>
+                              <option value="caregiver">Caregiver</option>
+                              <option value="admin">Admin</option>
+                            </select>
+                          </div>
+                          <div className="space-y-1">
+                            <Label>Actions</Label>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setInviteEmailByGroup((prev) => ({
+                                  ...prev,
+                                  [group.id]: "",
+                                }));
+                                setInvitePhoneByGroup((prev) => ({
+                                  ...prev,
+                                  [group.id]: "",
+                                }));
+                                setInviteRoleByGroup((prev) => ({
+                                  ...prev,
+                                  [group.id]: "member",
+                                }));
+                                setInviteErrorByGroup((prev) => ({
+                                  ...prev,
+                                  [group.id]: null,
+                                }));
+                              }}
+                              disabled={inviting}
+                            >
+                              Reset
+                            </Button>
+                          </div>
+                        </div>
+                        {inviteError && (
+                          <div className="text-xs text-red-600 bg-red-50 border border-red-100 p-2 rounded">
+                            {inviteError}
                           </div>
                         )}
-                        {memberState?.loading &&
-                          !memberState.members?.length && (
-                            <div className="text-sm text-gray-500">
-                              Loading members...
-                            </div>
-                          )}
+                      </form>
 
-                        <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
-                          {(memberState?.members || group.members || []).map(
-                            (member) => {
-                              const pendingAction =
-                                memberActionLoading[member.id];
-                              return (
-                                <div
-                                  key={member.id}
-                                  className="border rounded p-2 flex justify-between items-center bg-white"
-                                >
-                                  <div>
-                                    <div className="text-sm font-medium">
-                                      User #{member.user_id}
-                                    </div>
-                                    <div className="text-xs text-gray-500">
-                                      Role: {member.role} • Joined{" "}
-                                      {new Date(
-                                        member.joined_at,
-                                      ).toLocaleDateString()}
-                                    </div>
+                      <Separator className="my-2" />
+
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium text-gray-700">
+                          Members
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {
+                            (memberState?.members || group.members || [])
+                              .length
+                          }{" "}
+                          total
+                        </span>
+                      </div>
+
+                      {memberState?.error && (
+                        <div className="text-xs text-red-600 border border-red-100 bg-red-50 p-2 rounded">
+                          {memberState.error}
+                        </div>
+                      )}
+                      {memberState?.loading &&
+                        !memberState.members?.length && (
+                          <div className="text-sm text-gray-500">
+                            Loading members...
+                          </div>
+                        )}
+
+                      <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+                        {(memberState?.members || group.members || []).map(
+                          (member) => {
+                            const pendingAction =
+                              memberActionLoading[member.id];
+                            return (
+                              <div
+                                key={member.id}
+                                className="border rounded p-2 flex justify-between items-center bg-white"
+                              >
+                                <div>
+                                  <div className="text-sm font-medium">
+                                    User #{member.user_id}
                                   </div>
-                                  <div className="flex gap-2 items-center">
-                                    <select
-                                      disabled={pendingAction}
-                                      className="text-xs border rounded px-1 py-0.5"
-                                      value={member.role}
-                                      onChange={(e) =>
-                                        changeMemberRole(
-                                          group.id,
-                                          member,
-                                          e.target.value,
-                                        )
-                                      }
-                                    >
-                                      <option value="member">Member</option>
-                                      <option value="caregiver">
-                                        Caregiver
-                                      </option>
-                                      <option value="admin">Admin</option>
-                                    </select>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      disabled={pendingAction}
-                                      onClick={() =>
-                                        removeFamilyMember(
-                                          group.id,
-                                          member.id,
-                                          member.user_id,
-                                        )
-                                      }
-                                    >
-                                      {pendingAction ? "..." : "✕"}
-                                    </Button>
+                                  <div className="text-xs text-gray-500">
+                                    Role: {member.role} • Joined{" "}
+                                    {new Date(
+                                      member.joined_at,
+                                    ).toLocaleDateString()}
                                   </div>
                                 </div>
-                              );
-                            },
-                          )}
-                          {!memberState?.loading &&
-                            (memberState?.members || group.members || [])
-                              .length === 0 && (
-                              <div className="text-xs text-gray-500">
-                                No members yet. Invite someone!
+                                <div className="flex gap-2 items-center">
+                                  <select
+                                    disabled={pendingAction}
+                                    className="text-xs border rounded px-1 py-0.5"
+                                    value={member.role}
+                                    onChange={(e) =>
+                                      changeMemberRole(
+                                        group.id,
+                                        member,
+                                        e.target.value,
+                                      )
+                                    }
+                                  >
+                                    <option value="member">Member</option>
+                                    <option value="caregiver">
+                                      Caregiver
+                                    </option>
+                                    <option value="admin">Admin</option>
+                                  </select>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    disabled={pendingAction}
+                                    onClick={() =>
+                                      removeFamilyMember(
+                                        group.id,
+                                        member.id,
+                                        member.user_id,
+                                      )
+                                    }
+                                  >
+                                    {pendingAction ? "..." : "✕"}
+                                  </Button>
+                                </div>
                               </div>
-                            )}
-                        </div>
-                      </CardContent>
-                    )}
-                  </Card>
-                );
-              })}
+                            );
+                          },
+                        )}
+                        {!memberState?.loading &&
+                          (memberState?.members || group.members || [])
+                            .length === 0 && (
+                            <div className="text-xs text-gray-500">
+                              No members yet. Invite someone!
+                            </div>
+                          )}
+                      </div>
+                    </CardContent>
+                  )}
+                </Card>
+              );
+            })}
         </div>
 
         {familyGroups.length === 0 && !loadingGroups && !groupsError && (
