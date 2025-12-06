@@ -75,3 +75,35 @@ export interface ProviderAvailability {
   is_booked: boolean;
   created_at: string;
 }
+export interface AppointmentData {
+  user_name: string;
+  provider_name: string;
+  provider_id: number;
+  date_time: string;
+  consultation_type: string;
+  notes?: string;
+}
+
+export interface Slot {
+  id: number
+  provider_id: number
+  name: string
+  specialty: string
+  start_time: string
+  end_time: string
+}
+
+export interface Appointment {
+  id: number
+  appointment_id: string
+  provider_id: number
+  date_time: string
+  consultation_type: string
+  notes: string | null
+  cancelled: boolean
+  cancellation_reason: string | null
+  created_at: string
+  user_id: number
+  user_name: string
+  provider_name: string
+}

@@ -127,7 +127,9 @@ export default function ProfilePage() {
       try {
         startLoading("fetchFamilyGroup");
         // 获取所有家庭群组
-        const data = await getFamilyGroups();
+        // 使用认证上下文中的用户ID
+        const userId = user?.id || 0;
+        const data = await getFamilyGroups(userId);
         // 假设使用第一个家庭群组，实际应用中应从用户数据中获取
         const familyGroup = data[0] || null;
         if (familyGroup) {
@@ -396,28 +398,28 @@ export default function ProfilePage() {
                             </div>
                           </div>
                           <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedProvider(provider)}
-                      >
-                        Manage Availability
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          handleDissociateProvider(provider.id)
-                        }
-                        disabled={isLoading(
-                          `dissociateProvider-${provider.id}`,
-                        )}
-                      >
-                        {isLoading(`dissociateProvider-${provider.id}`)
-                          ? "Deleting..."
-                          : "Delete"}
-                      </Button>
-                    </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedProvider(provider)}
+                            >
+                              Manage Availability
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                handleDissociateProvider(provider.id)
+                              }
+                              disabled={isLoading(
+                                `dissociateProvider-${provider.id}`,
+                              )}
+                            >
+                              {isLoading(`dissociateProvider-${provider.id}`)
+                                ? "Deleting..."
+                                : "Delete"}
+                            </Button>
+                          </div>
                         </div>
                       ))
                     ) : (
@@ -436,14 +438,14 @@ export default function ProfilePage() {
                         Add New Provider
                       </Button>
                     </div>
-                    
+
                     {selectedProvider && (
                       <div className="mt-6">
-                        <ProviderAvailabilityManager 
-                          provider={selectedProvider} 
+                        <ProviderAvailabilityManager
+                          provider={selectedProvider}
                           onAvailabilityUpdate={() => {
                             // 可以在这里添加任何需要在更新可用性时执行的逻辑
-                          }} 
+                          }}
                         />
                       </div>
                     )}

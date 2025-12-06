@@ -101,9 +101,10 @@ class Appointment(Base):
     __tablename__ = "appointments"
 
     id = Column(Integer, primary_key=True, index=True)
-    appointment_id = Column(String, unique=True, index=True)  # Unique appointment ID
     user_id = Column(Integer, ForeignKey("users.id"))
     provider_id = Column(Integer, ForeignKey("providers.id"))
+    user_name = Column(String)
+    provider_name = Column(String)
     date_time = Column(DateTime)
     consultation_type = Column(String)  # "in-person" or "online"
     notes = Column(String, nullable=True)
@@ -174,12 +175,20 @@ class Invitation(Base):
     sender_id = Column(Integer, ForeignKey("users.id"))
     recipient_email = Column(String, nullable=True)  # For unregistered users
     recipient_phone = Column(String, nullable=True)  # For unregistered users
-    invitation_type = Column(String)  # "challenge" or "data_sharing"
+    invitation_type = Column(String)  # "challenge", "data_sharing", or "family_group"
+    challenge_id = Column(
+        Integer, ForeignKey("challenges.id"), nullable=True
+    )  # For challenge invitations
+    family_group_id = Column(
+        Integer, ForeignKey("family_groups.id"), nullable=True
+    )  # For family group invitations
     sent_at = Column(DateTime, default=datetime.utcnow)
     accepted_at = Column(DateTime, nullable=True)
     expired_at = Column(DateTime, nullable=True)
     is_accepted = Column(Boolean, default=False)
     is_expired = Column(Boolean, default=False)
+    is_rejected = Column(Boolean, default=False)
+    rejected_at = Column(DateTime, nullable=True)
 
 
 class ProviderAvailability(Base):

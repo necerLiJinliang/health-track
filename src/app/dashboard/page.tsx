@@ -69,7 +69,7 @@ export default function DashboardPage() {
                 ) : (
                   appointments.map((appointment, idx) => (
                     <div
-                      key={appointment.id || idx}
+                      key={idx}
                       className={`border-l-4 ${
                         idx % 2 === 0 ? "border-blue-500" : "border-green-500"
                       } pl-4 py-1`}

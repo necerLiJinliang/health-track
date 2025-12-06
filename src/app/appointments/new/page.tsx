@@ -2,26 +2,22 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
-import { 
-  createAppointment, 
-  getAssociatedProvider, 
-  getAvailableProviderSlots 
+import {
+  createAppointment,
+  getAvailableProviderSlots
 } from "@/lib/api";
 import { useLoadingManager } from "@/lib/loadingManager";
 import { getErrorMessage } from "@/lib/apiErrorHandler";
-import { Provider, ProviderAvailability } from "@/types";
+import { ProviderAvailability } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function NewAppointmentPage() {
@@ -40,8 +36,7 @@ export default function NewAppointmentPage() {
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [showAvailableSlots, setShowAvailableSlots] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loadingStates, { startLoading, stopLoading, isLoading }] =
-    useLoadingManager();
+  const [loadingStates, { startLoading, stopLoading, isLoading }] = useLoadingManager()
 
   // 处理从URL传入的时间段ID参数
   useEffect(() => {
@@ -69,7 +64,7 @@ export default function NewAppointmentPage() {
       setAvailableSlots(slots);
       setShowAvailableSlots(true);
       setError(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to fetch available slots:", err);
       setError(getErrorMessage(err) || "Failed to fetch available slots");
     } finally {
@@ -135,7 +130,7 @@ export default function NewAppointmentPage() {
 
       // 重定向到预约列表页面
       router.push("/appointments");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to create appointment:", err);
       setError(getErrorMessage(err));
     } finally {
@@ -191,8 +186,8 @@ export default function NewAppointmentPage() {
                       onChange={handleChange}
                       required
                     />
-                    <Button 
-                      type="button" 
+                    <Button
+                      type="button"
                       onClick={() => {
                         const providerId = parseInt(formData.providerLicense);
                         if (!isNaN(providerId)) {
@@ -240,17 +235,16 @@ export default function NewAppointmentPage() {
                     {availableSlots.length > 0 ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                         {availableSlots.map((slot) => (
-                          <div 
+                          <div
                             key={slot.id}
-                            className={`p-3 border rounded-md cursor-pointer ${
-                              selectedSlot === slot.id 
-                                ? "border-blue-500 bg-blue-50" 
-                                : "border-gray-300 hover:border-blue-300"
-                            }`}
+                            className={`p-3 border rounded-md cursor-pointer ${selectedSlot === slot.id
+                              ? "border-blue-500 bg-blue-50"
+                              : "border-gray-300 hover:border-blue-300"
+                              }`}
                             onClick={() => setSelectedSlot(slot.id)}
                           >
                             <div className="font-medium">
-                              {new Date(slot.start_time).toLocaleDateString()} - {new Date(slot.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} to {new Date(slot.end_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                              {new Date(slot.start_time).toLocaleDateString()} - {new Date(slot.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} to {new Date(slot.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </div>
                           </div>
                         ))}
@@ -258,10 +252,10 @@ export default function NewAppointmentPage() {
                     ) : (
                       <p className="text-gray-500">No available slots found for this provider.</p>
                     )}
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
                       className="mt-2"
                       onClick={() => {
                         setShowAvailableSlots(false);

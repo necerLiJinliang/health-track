@@ -3,7 +3,7 @@ import { handleApiError } from "@/lib/apiErrorHandler";
 import Cookies from "js-cookie";
 
 const API_BASE_URL = "http://localhost:8000";
-
+import { AppointmentData } from "@/types";
 // 获取认证令牌
 const getAuthToken = () => {
   return Cookies.get("authToken");
@@ -256,12 +256,7 @@ export const createProvider = async (providerData: ProviderData) => {
   return response.json();
 };
 
-interface AppointmentData {
-  provider_id: number;
-  date_time: string;
-  consultation_type: string;
-  notes?: string;
-}
+
 
 // Appointment API
 export const createAppointment = async (
@@ -322,7 +317,7 @@ export const cancelAppointment = async (
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ reason }),
+      body: JSON.stringify({ reason: reason }),
     }),
   );
 
@@ -372,16 +367,17 @@ export const getChallenges = async () => {
   }
 
   const challengesData = await response.json();
-  return challengesData.map((challenge: any) => ({
-    id: challenge.id,
-    challenge_id: challenge.challenge_id,
-    creator_id: challenge.creator_id,
-    goal: challenge.goal,
-    start_date: challenge.start_date,
-    end_date: challenge.end_date,
-    created_at: challenge.created_at,
-    participants: challenge.participants || [],
-  }));
+  // return challengesData.map((challenge: any) => ({
+  //   id: challenge.id,
+  //   challenge_id: challenge.challenge_id,
+  //   creator_id: challenge.creator_id,
+  //   goal: challenge.goal,
+  //   start_date: challenge.start_date,
+  //   end_date: challenge.end_date,
+  //   created_at: challenge.created_at,
+  //   participants: challenge.participants || [],
+  // }));
+  return challengesData
 };
 
 export const joinChallenge = async (challengeId: number, userId: number) => {
@@ -404,6 +400,21 @@ export const getChallengeParticipants = async (challengeId: number) => {
     `${API_BASE_URL}/challenges/${challengeId}/participants`,
     getAuthFetchOptions({
       method: "GET",
+    }),
+  );
+
+  if (!response.ok) {
+    await handleApiError(response);
+  }
+
+  return response.json();
+};
+
+export const addChallengeParticipant = async (challengeId: number, userId: number) => {
+  const response = await fetch(
+    `${API_BASE_URL}/challenges/${challengeId}/participants/${userId}`,
+    getAuthFetchOptions({
+      method: "POST",
     }),
   );
 
@@ -519,6 +530,79 @@ export const getCurrentUser = async (): Promise<User> => {
   return response.json();
 };
 
+// Invitation API
+interface InvitationData {
+  recipient_email?: string;
+  recipient_phone?: string;
+  invitation_type: string;
+  challenge_id?: number;
+  family_group_id?: number;
+}
+
+export const createInvitation = async (
+  invitationData: InvitationData,
+  senderId: number,
+) => {
+  const response = await fetch(
+    `${API_BASE_URL}/invitations/?sender_id=${senderId}`,
+    getAuthFetchOptions({
+      method: "POST",
+      body: JSON.stringify(invitationData),
+    }),
+  );
+
+  if (!response.ok) {
+    await handleApiError(response);
+  }
+
+  return response.json();
+};
+
+export const getInvitations = async (userId: number) => {
+  const response = await fetch(
+    `${API_BASE_URL}/invitations/user/${userId}`,
+    getAuthFetchOptions({
+      method: "GET",
+    }),
+  );
+
+  if (!response.ok) {
+    await handleApiError(response);
+  }
+
+  return response.json();
+};
+
+export const acceptInvitation = async (invitationId: number) => {
+  const response = await fetch(
+    `${API_BASE_URL}/invitations/${invitationId}/accept`,
+    getAuthFetchOptions({
+      method: "PUT",
+    }),
+  );
+
+  if (!response.ok) {
+    await handleApiError(response);
+  }
+
+  return response.json();
+};
+
+export const rejectInvitation = async (invitationId: number) => {
+  const response = await fetch(
+    `${API_BASE_URL}/invitations/${invitationId}/reject`,
+    getAuthFetchOptions({
+      method: "PUT",
+    }),
+  );
+
+  if (!response.ok) {
+    await handleApiError(response);
+  }
+
+  return response.json();
+};
+
 // Provider Availability API
 interface ProviderAvailabilityData {
   provider_id: number;
@@ -595,6 +679,22 @@ export const deleteProviderAvailability = async (availabilityId: number) => {
     `${API_BASE_URL}/providers-availability/${availabilityId}`,
     getAuthFetchOptions({
       method: "DELETE",
+    })
+  );
+
+  if (!response.ok) {
+    await handleApiError(response);
+  }
+
+  return response.json();
+};
+
+export const bookAppointment = async (appointmentData: AppointmentData, user_id: number) => {
+  const response = await fetch(
+    `${API_BASE_URL}/appointments/?user_id=${user_id}`,
+    getAuthFetchOptions({
+      method: "POST",
+      body: JSON.stringify(appointmentData),
     })
   );
 

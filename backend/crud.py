@@ -272,9 +272,32 @@ def get_appointments(db: Session, skip: int = 0, limit: int = 100):
 
 
 def get_user_appointments(db: Session, user_id: int):
-    return (
-        db.query(models.Appointment).filter(models.Appointment.user_id == user_id).all()
+    # Get all appointments where the user is the patient, including provider data
+    user_appointments = (
+        db.query(models.Appointment)
+        .options(joinedload(models.Appointment.provider))
+        .filter(models.Appointment.user_id == user_id)
+        .all()
     )
+
+    # Get all providers associated with the user
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user:
+        # Get all provider IDs associated with the user
+        provider_ids = [provider.id for provider in user.providers]
+
+        # Get all appointments for these providers, including provider data
+        provider_appointments = (
+            db.query(models.Appointment)
+            .options(joinedload(models.Appointment.provider))
+            .filter(models.Appointment.provider_id.in_(provider_ids))
+            .all()
+        )
+
+        # Combine and return all appointments
+        return user_appointments + provider_appointments
+
+    return user_appointments
 
 
 def create_appointment(
@@ -298,8 +321,9 @@ def create_appointment(
         raise ValueError("Selected time slot is not available")
 
     db_appointment = models.Appointment(
-        appointment_id=appointment.appointment_id,
         user_id=user_id,
+        user_name=appointment.user_name,
+        provider_name=appointment.provider_name,
         provider_id=appointment.provider_id,
         date_time=appointment.date_time,
         consultation_type=appointment.consultation_type,
@@ -324,6 +348,25 @@ def cancel_appointment(db: Session, appointment_id: int, reason: str):
     if db_appointment and not db_appointment.cancelled:
         db_appointment.cancelled = True
         db_appointment.cancellation_reason = reason
+
+        # Find the associated availability slot and mark it as available again
+        availability_slot = (
+            db.query(models.ProviderAvailability)
+            .filter(
+                and_(
+                    models.ProviderAvailability.provider_id
+                    == db_appointment.provider_id,
+                    models.ProviderAvailability.start_time <= db_appointment.date_time,
+                    models.ProviderAvailability.end_time > db_appointment.date_time,
+                    models.ProviderAvailability.is_booked == True,
+                )
+            )
+            .first()
+        )
+
+        if availability_slot:
+            availability_slot.is_booked = False
+
         db.commit()
         return True
     return False
@@ -439,10 +482,10 @@ def add_member_to_family_group(
     return True
 
 
-def get_user_by_phone_number(db: Session, phone_number: str):
-    return (
-        db.query(models.User).filter(models.User.phone_number == phone_number).first()
-    )
+# def get_user_by_phone_number(db: Session, phone_number: str):
+#     return (
+#         db.query(models.User).filter(models.User.phone_number == phone_number).first()
+#     )
 
 
 def get_family_groups_by_user_id(db: Session, user_id: int):
@@ -491,17 +534,78 @@ def create_invitation(
     return db_invitation
 
 
+def get_user_invitations(db: Session, user_id: int):
+    """
+    Get all invitations for a user by their email or phone number
+    """
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        return []
+
+    # Get invitations by user's emails and phone number
+    invitations = (
+        db.query(models.Invitation)
+        .filter(
+            (
+                (
+                    models.Invitation.recipient_email.in_(
+                        [email.email_address for email in user.emails]
+                    )
+                )
+                | (models.Invitation.recipient_phone == user.phone_number)
+            )
+            & ~models.Invitation.is_expired
+            & ~models.Invitation.is_accepted
+            & ~models.Invitation.is_rejected
+        )
+        .all()
+    )
+    return invitations
+
+
 def accept_invitation(db: Session, invitation_id: int):
     db_invitation = (
         db.query(models.Invitation)
         .filter(models.Invitation.id == invitation_id)
         .first()
     )
-    if db_invitation and not db_invitation.is_expired and not db_invitation.is_accepted:
+    if (
+        db_invitation
+        and not db_invitation.is_expired
+        and not db_invitation.is_accepted
+        and not db_invitation.is_rejected
+    ):
         # Check if invitation is still valid (not expired)
         if datetime.utcnow() < db_invitation.expired_at:
             db_invitation.is_accepted = True
             db_invitation.accepted_at = datetime.utcnow()
+            db_invitation.is_expired = True
+            db.commit()
+            return True
+        else:
+            # Mark as expired if past expiration date
+            db_invitation.is_expired = True
+            db.commit()
+    return False
+
+
+def reject_invitation(db: Session, invitation_id: int):
+    db_invitation = (
+        db.query(models.Invitation)
+        .filter(models.Invitation.id == invitation_id)
+        .first()
+    )
+    if (
+        db_invitation
+        and not db_invitation.is_expired
+        and not db_invitation.is_accepted
+        and not db_invitation.is_rejected
+    ):
+        # Check if invitation is still valid (not expired)
+        if datetime.utcnow() < db_invitation.expired_at:
+            db_invitation.is_rejected = True
+            db_invitation.rejected_at = datetime.utcnow()
+            db_invitation.is_expired = True
             db.commit()
             return True
         else:
@@ -603,3 +707,12 @@ def delete_provider_availability(db: Session, availability_id: int):
         db.commit()
         return True
     return False
+
+
+def get_challenge_by_user(db: Session, user_id: int):
+    return (
+        db.query(models.Challenge)
+        .join(models.Challenge.participants)
+        .filter(models.User.id == user_id)
+        .all()
+    )

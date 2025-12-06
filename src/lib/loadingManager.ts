@@ -1,5 +1,5 @@
 // src/lib/loadingManager.ts
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 
 interface LoadingState {
   [key: string]: boolean;
@@ -17,6 +17,14 @@ interface LoadingActions {
  */
 export const useLoadingManager = (): [LoadingState, LoadingActions] => {
   const [loadingStates, setLoadingStates] = useState<LoadingState>({});
+  
+  // 使用useRef来保持对最新loadingStates的引用
+  const loadingStatesRef = useRef<LoadingState>(loadingStates);
+  
+  // 当loadingStates变化时，更新ref
+  useEffect(() => {
+    loadingStatesRef.current = loadingStates;
+  }, [loadingStates]);
 
   /**
    * 开始加载
@@ -40,8 +48,9 @@ export const useLoadingManager = (): [LoadingState, LoadingActions] => {
    * @returns 是否正在加载
    */
   const isLoading = useCallback((key: string) => {
-    return !!loadingStates[key];
-  }, [loadingStates]);
+    // 从ref中获取最新的loadingStates，避免依赖问题
+    return !!loadingStatesRef.current[key];
+  }, []);
 
   return [
     loadingStates,

@@ -86,6 +86,16 @@ export default function Navigation() {
                   Family Group
                 </button>
                 <button
+                  onClick={() => router.push("/messages")}
+                  className={`${
+                    pathname === "/messages"
+                      ? "text-blue-600 font-medium"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  Messages
+                </button>
+                <button
                   onClick={() => router.push("/profile")}
                   className={`${
                     pathname === "/profile"
