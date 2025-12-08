@@ -104,6 +104,7 @@ cd backend
 - 创建并激活虚拟环境：
 
 使用uv：
+
 ```bash
 uv venv 
 source venv/bin/activate  # Linux/Mac
@@ -113,6 +114,7 @@ uv pip install -r requirements.txt
 ```
 
 使用conda：
+
 ```bash
 conda create -n healthtrack_env python=3.9 -y
 conda activate healthtrack_env
