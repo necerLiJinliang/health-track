@@ -145,7 +145,15 @@ npm install
 cd backend
 # 在 backend 目录下运行：
 uv uvicorn main:app --reload
+```
 
+在根目录中创建一个文件 `.env.local`，添加以下内容以配置后端API地址：
+
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+```bash
 # 启动前端服务器
 # 在项目根目录下运行：
 npm run dev
