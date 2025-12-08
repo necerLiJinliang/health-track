@@ -91,7 +91,7 @@ git clone xxx
 2. 进入项目目录：
 
 ```bash
-cd health-track-front
+cd health-track
 ```
 
 3. 配置后端
