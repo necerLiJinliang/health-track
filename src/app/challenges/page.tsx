@@ -11,10 +11,11 @@ import {
 } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { getChallenges } from "@/lib/api";
+import { getChallenges, createInvitation } from "@/lib/api";
 import { useLoadingManager } from "@/lib/loadingManager";
 import { getErrorMessage } from "@/lib/apiErrorHandler";
 import { useAuth } from "@/contexts/AuthContext";
+import InviteUserModal from "@/components/InviteUserModal";
 
 type Challenge = {
   id: number;
@@ -37,6 +38,15 @@ export default function ChallengesPage() {
   const [error, setError] = useState<string | null>(null);
   const [loadingStates, { startLoading, stopLoading, isLoading }] =
     useLoadingManager();
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [inviteChallengeId, setInviteChallengeId] = useState<number | null>(
+    null,
+  );
+  const handleInviteUser = (id: number) => {
+    setInviteChallengeId(id);
+    setIsInviteOpen(true);
+  };
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -60,7 +70,7 @@ export default function ChallengesPage() {
           startDate: new Date(challenge.start_date).toLocaleDateString(),
           endDate: new Date(challenge.end_date).toLocaleDateString(),
           participants: challenge.participants?.length || 1,
-          progress: Math.floor(Math.random() * 100), // 临时随机进度，实际应该从后端获取
+          progress: challenge.progress, // 临时随机进度，实际应该从后端获取
           status: "active", // 临时状态，实际应该根据日期计算
         }));
 
@@ -81,6 +91,26 @@ export default function ChallengesPage() {
       challenge.goal.toLowerCase().includes(searchTerm.toLowerCase()) ||
       challenge.creator_id.toString().includes(searchTerm.toLowerCase()),
   );
+
+  const handleToggleDetails = (id: number) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+  };
+
+  const handleUpdateProgress = (id: number) => {
+    const current = challenges.find((c) => c.id === id)?.progress ?? 0;
+    const input = window.prompt("Enter new progress (0-100):", String(current));
+    if (input === null) return;
+    const value = Number(input);
+    if (Number.isNaN(value) || value < 0 || value > 100) {
+      alert("Please enter a valid number between 0 and 100.");
+      return;
+    }
+    setChallenges((prev) =>
+      prev.map((c) =>
+        c.id === id ? { ...c, progress: Math.round(value) } : c,
+      ),
+    );
+  };
 
   // if (isLoading('fetchChallenges')) {
   //   return (
@@ -187,15 +217,79 @@ export default function ChallengesPage() {
                   </div>
 
                   <div className="flex gap-2 pt-2">
-                    <Button variant="outline" size="sm" className="flex-1">
-                      View Details
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => handleToggleDetails(challenge.id)}
+                    >
+                      {expandedId === challenge.id
+                        ? "Hide Details"
+                        : "View Details"}
                     </Button>
                     {challenge.status === "active" && (
-                      <Button size="sm" className="flex-1">
+                      <Button
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => handleUpdateProgress(challenge.id)}
+                      >
                         Update Progress
                       </Button>
                     )}
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => handleInviteUser(challenge.id)}
+                    >
+                      Invite User
+                    </Button>
                   </div>
+
+                  {expandedId === challenge.id && (
+                    <div className="mt-4 border-t pt-3 space-y-2 text-sm text-gray-700">
+                      <div className="flex justify-between">
+                        <span className="font-medium">Goal</span>
+                        <span>{challenge.goal}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-medium">Creator</span>
+                        <span>{challenge.creator_id}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-medium">Start Date</span>
+                        <span>{challenge.start_date}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-medium">End Date</span>
+                        <span>{challenge.end_date}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium">Participants</span>
+                        <div className="mt-1 text-xs text-gray-600">
+                          {Array.isArray(challenge.participants) ? (
+                            challenge.participants.length > 0 ? (
+                              <ul className="list-disc ml-5">
+                                {challenge.participants.map(
+                                  (p: any, idx: number) => (
+                                    <li key={idx}>
+                                      {typeof p === "string"
+                                        ? p
+                                        : p?.name || p?.id || "Unknown"}
+                                    </li>
+                                  ),
+                                )}
+                              </ul>
+                            ) : (
+                              <span>No participants data</span>
+                            )
+                          ) : (
+                            <span>{challenge.participants} participant(s)</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -215,6 +309,45 @@ export default function ChallengesPage() {
             </Button>
           </div>
         )}
+        <InviteUserModal
+          isOpen={isInviteOpen}
+          onClose={() => {
+            setIsInviteOpen(false);
+            setInviteChallengeId(null);
+          }}
+          challengeId={inviteChallengeId ?? undefined}
+          onInvite={async ({ challengeId, method, value }) => {
+            if (!user) {
+              alert("You need to be logged in to send invitations.");
+              return;
+            }
+            const payload: {
+              recipient_email?: string;
+              recipient_phone?: string;
+              invitation_type: string;
+              challenge_id?: number;
+            } = {
+              invitation_type: "challenge",
+              challenge_id: challengeId,
+            };
+            if (method === "email") {
+              payload.recipient_email = value;
+            } else {
+              payload.recipient_phone = value;
+            }
+            try {
+              await createInvitation(payload, user.id);
+              alert("Invitation sent successfully.");
+            } catch (e: any) {
+              alert(
+                e?.message || "Failed to send invitation. Please try again.",
+              );
+            } finally {
+              setIsInviteOpen(false);
+              setInviteChallengeId(null);
+            }
+          }}
+        />
       </main>
     </div>
   );

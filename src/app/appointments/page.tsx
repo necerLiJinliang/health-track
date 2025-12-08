@@ -1,38 +1,62 @@
-'use client'
+"use client";
 
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { useRouter } from 'next/navigation'
-import { useState, useEffect, useCallback } from 'react'
-import { getUserAppointments, getAssociatedProvider, getAllProvidersAvailableSlots } from '@/lib/api'
-import { useLoadingManager } from '@/lib/loadingManager'
-import { getErrorMessage } from '@/lib/apiErrorHandler'
-import { useAuth } from '@/contexts/AuthContext'
-import { Provider, ProviderAvailability } from '@/types'
-import { ProviderAvailabilityModal } from '@/components/ProviderAvailabilityModal'
-import { AppointmentData } from '@/types'
-import { createAppointment } from '@/lib/api'
-import type { Appointment, Slot } from '@/types'
-import { cancelAppointment } from '@/lib/api'
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback } from "react";
+import {
+  getUserAppointments,
+  getAssociatedProvider,
+  getAllProvidersAvailableSlots,
+} from "@/lib/api";
+import { useLoadingManager } from "@/lib/loadingManager";
+import { getErrorMessage } from "@/lib/apiErrorHandler";
+import { useAuth } from "@/contexts/AuthContext";
+import { Provider, ProviderAvailability } from "@/types";
+import { ProviderAvailabilityModal } from "@/components/ProviderAvailabilityModal";
+import { AppointmentData } from "@/types";
+import { createAppointment } from "@/lib/api";
+import type { Appointment, Slot } from "@/types";
+import { cancelAppointment } from "@/lib/api";
 export default function AppointmentsPage() {
-  const router = useRouter()
-  const { user, isAuthenticated } = useAuth()
-  const [searchTerm, setSearchTerm] = useState('')
-  const [appointments, setAppointments] = useState<Appointment[]>([])
-  const [filteredAppointments, setFilteredAppointments] = useState<Appointment[]>([])
-  const [providers, setProviders] = useState<Provider[]>([])
-  const [availableSlots, setAvailableSlots] = useState<Slot[]>([])
-  const [showAvailableSlots, setShowAvailableSlots] = useState(false)
+  const router = useRouter();
+  const { user, isAuthenticated } = useAuth();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [filteredAppointments, setFilteredAppointments] = useState<
+    Appointment[]
+  >([]);
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [availableSlots, setAvailableSlots] = useState<Slot[]>([]);
+  const [showAvailableSlots, setShowAvailableSlots] = useState(false);
   // 移除了selectedProvider状态，因为现在使用模态框方式
-  const [error, setError] = useState<string | null>(null)
-  const [loadingStates, { startLoading, stopLoading, isLoading }] = useLoadingManager()
+  const [error, setError] = useState<string | null>(null);
+  const [loadingStates, { startLoading, stopLoading, isLoading }] =
+    useLoadingManager();
+  const [cancellingIds, setCancellingIds] = useState<Set<number>>(new Set());
+
+  // Periodically purge expired availability slots (past start_time)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setAvailableSlots((prev) =>
+        prev.filter((slot) => new Date(slot.start_time) > new Date()),
+      );
+    }, 60000); // run every 60 seconds
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) {
-      router.push('/login')
+      router.push("/login");
     }
-  }, [isAuthenticated, router])
+  }, [isAuthenticated, router]);
 
   // 获取关联的Providers
   const fetchProviders = useCallback(async () => {
@@ -79,55 +103,64 @@ export default function AppointmentsPage() {
   };
   const handleBookAppointment = async (slot: Slot, user_id: number) => {
     try {
-      startLoading('bookAppointment')
-      setError(null)
+      startLoading("bookAppointment");
+      setError(null);
       const appointmentData: AppointmentData = {
-        user_name: user?.name || '',
+        user_name: user?.name || "",
         provider_name: slot.name,
         provider_id: slot.provider_id,
         date_time: slot.start_time,
-        consultation_type: 'general', // 或从用户输入获取
-        notes: '', // 或从用户输入获取
-      }
+        consultation_type: "general", // 或从用户输入获取
+        notes: "", // 或从用户输入获取
+      };
       // 使用认证上下文中的用户ID
-      const userId = user?.id || 0
+      const userId = user?.id || 0;
       // 调用预约API
-      await createAppointment(appointmentData, userId)
+      await createAppointment(appointmentData, userId);
       // 预约成功后，刷新预约列表
-      const data = await getUserAppointments(userId)
-      setAppointments(data)
-      setFilteredAppointments(data)
+      const data = await getUserAppointments(userId);
+      setAppointments(data);
+      setFilteredAppointments(data);
       // 关闭模态框
-      setShowAvailableSlots(false)
+      setShowAvailableSlots(false);
     } finally {
-      stopLoading('bookAppointment')
+      stopLoading("bookAppointment");
     }
-  }
+  };
   // 获取预约列表
   useEffect(() => {
     const fetchAppointments = async () => {
       try {
-        startLoading('fetchAppointments')
-        setError(null)
+        startLoading("fetchAppointments");
+        setError(null);
         // 使用认证上下文中的用户ID
-        const userId = user?.id || 0
-        const data = await getUserAppointments(userId)
-        setAppointments(data)
-        setFilteredAppointments(data)
+        const userId = user?.id || 0;
+        const data = await getUserAppointments(userId);
+        setAppointments(data);
+        setFilteredAppointments(data);
       } catch (err: unknown) {
-        console.error('Failed to fetch appointments:', err)
-        setError(getErrorMessage(err) || 'Failed to load appointments')
+        console.error("Failed to fetch appointments:", err);
+        setError(getErrorMessage(err) || "Failed to load appointments");
       } finally {
-        stopLoading('fetchAppointments')
+        stopLoading("fetchAppointments");
       }
-    }
+    };
 
     if (isAuthenticated) {
-      fetchAppointments()
-      fetchProviders()
-      fetchAllProvidersAvailableSlots()
+      fetchAppointments();
+      fetchProviders();
+      fetchAllProvidersAvailableSlots();
     }
-  }, [isAuthenticated, user?.id, startLoading, stopLoading, fetchProviders, setAppointments, setFilteredAppointments, setError])
+  }, [
+    isAuthenticated,
+    user?.id,
+    startLoading,
+    stopLoading,
+    fetchProviders,
+    setAppointments,
+    setFilteredAppointments,
+    setError,
+  ]);
 
   // 根据搜索词过滤预约
   useEffect(() => {
@@ -135,57 +168,73 @@ export default function AppointmentsPage() {
     //   appointment.provider.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     //   appointment.consultation_type.toLowerCase().includes(searchTerm.toLowerCase())
     // )
-    const filtered = appointments
-    setFilteredAppointments(filtered)
-  }, [searchTerm, appointments])
+    const filtered = appointments;
+    setFilteredAppointments(filtered);
+  }, [searchTerm, appointments]);
 
   // 格式化日期时间显示
   const formatDateTime = (dateTimeStr: string) => {
-    const date = new Date(dateTimeStr)
+    const date = new Date(dateTimeStr);
     return {
       date: date.toLocaleDateString(),
-      time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    }
-  }
+      time: date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    };
+  };
 
   // 获取预约状态
   const getAppointmentStatus = (appointment: Appointment) => {
-    if (appointment.cancelled) return 'cancelled'
-    const appointmentDate = new Date(appointment.date_time)
-    const now = new Date()
-    return appointmentDate > now ? 'upcoming' : 'completed'
-  }
+    if (appointment.cancelled) return "cancelled";
+    const appointmentDate = new Date(appointment.date_time);
+    const now = new Date();
+    return appointmentDate > now ? "upcoming" : "completed";
+  };
 
   // 取消预约
   const handleCancelAppointment = async (appointmentId: number) => {
     try {
-      startLoading(`cancelAppointment-${appointmentId}`)
+      // add this appointment to cancelling set to trigger animation
+      setCancellingIds((prev) => new Set([...prev, appointmentId]));
+      startLoading(`cancelAppointment-${appointmentId}`);
       // 这里应该调用取消预约的API
-      await cancelAppointment(appointmentId, "User requested cancellation")
+      await cancelAppointment(appointmentId, "User requested cancellation");
       // 模拟API调用延迟
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       // 更新本地状态以反映取消
-      setAppointments(prev => prev.map(appt =>
-        appt.id === appointmentId ? { ...appt, cancelled: true } : appt
-      ))
-      setFilteredAppointments(prev => prev.map(appt =>
-        appt.id === appointmentId ? { ...appt, cancelled: true } : appt
-      ))
-      console.log(`Cancel appointment ${appointmentId}`)
+      setAppointments((prev) =>
+        prev.map((appt) =>
+          appt.id === appointmentId ? { ...appt, cancelled: true } : appt,
+        ),
+      );
+      setFilteredAppointments((prev) =>
+        prev.map((appt) =>
+          appt.id === appointmentId ? { ...appt, cancelled: true } : appt,
+        ),
+      );
+      console.log(`Cancel appointment ${appointmentId}`);
+      // Refresh available slots so cancelled slot becomes available again
+      await fetchAllProvidersAvailableSlots();
     } catch (err: unknown) {
-      console.error('Failed to cancel appointment:', err)
-      setError(getErrorMessage(err) || 'Failed to cancel appointment')
+      console.error("Failed to cancel appointment:", err);
+      setError(getErrorMessage(err) || "Failed to cancel appointment");
     } finally {
-      stopLoading(`cancelAppointment-${appointmentId}`)
+      stopLoading(`cancelAppointment-${appointmentId}`);
+      // remove from cancelling set after animation duration
+      setTimeout(() => {
+        setCancellingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(appointmentId);
+          return next;
+        });
+      }, 400); // match CSS transition timing
     }
-  }
+  };
 
-  if (isLoading('fetchAppointments')) {
+  if (isLoading("fetchAppointments")) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <p>Loading appointments...</p>
       </div>
-    )
+    );
   }
 
   if (error) {
@@ -195,7 +244,7 @@ export default function AppointmentsPage() {
           Error: {error}
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -222,7 +271,8 @@ export default function AppointmentsPage() {
               <CardHeader>
                 <CardTitle>Healthcare Providers</CardTitle>
                 <CardDescription>
-                  Manage your healthcare providers and set availability schedules
+                  Manage your healthcare providers and set availability
+                  schedules
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -254,7 +304,7 @@ export default function AppointmentsPage() {
                           <ProviderAvailabilityModal
                             provider={provider}
                             onAvailabilityUpdate={() => {
-                              fetchAllProvidersAvailableSlots()
+                              fetchAllProvidersAvailableSlots();
                             }}
                           >
                             <Button variant="outline" size="sm">
@@ -270,7 +320,8 @@ export default function AppointmentsPage() {
                         You haven&#39;t associated any healthcare providers yet.
                       </p>
                       <p className="text-gray-500 mt-2">
-                        Please associate providers in your profile to manage their availability.
+                        Please associate providers in your profile to manage
+                        their availability.
                       </p>
                     </div>
                   )}
@@ -300,7 +351,9 @@ export default function AppointmentsPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                {isLoading("fetchAllSlots") && <p>Loading available slots...</p>}
+                {isLoading("fetchAllSlots") && (
+                  <p>Loading available slots...</p>
+                )}
                 {error && (
                   <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md text-sm">
                     Error: {error}
@@ -308,36 +361,52 @@ export default function AppointmentsPage() {
                 )}
                 <div className="space-y-4">
                   {availableSlots.length > 0 ? (
-                    availableSlots.map((slot) => (
-                      <div
-                        key={slot.id}
-                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
-                      >
-                        <div>
-                          <h3 className="font-medium">
-                            {providers.find(p => p.id === slot.provider_id)?.name || 'Unknown Provider'}
-                          </h3>
-                          <h3 className="text-sm text-gray-600">
-                            Specialty: {slot.specialty || 'Unknown Specialty'}
-                          </h3>
-                          <p className="text-sm text-gray-600">
-                            {new Date(slot.start_time).toLocaleString()} - {new Date(slot.end_time).toLocaleString()}
-                          </p>
+                    availableSlots
+                      .filter(
+                        (slot) =>
+                          new Date(slot.start_time) > new Date() &&
+                          !providers.some((p) => p.id === slot.provider_id),
+                      )
+                      .map((slot) => (
+                        <div
+                          key={slot.id}
+                          className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                        >
+                          <div>
+                            <h3 className="font-medium">
+                              {providers.find((p) => p.id === slot.provider_id)
+                                ?.name || "Unknown Provider"}
+                              {providers.some(
+                                (p) => p.id === slot.provider_id,
+                              ) && (
+                                <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 border border-green-200 align-middle">
+                                  My Provider
+                                </span>
+                              )}
+                            </h3>
+                            <h3 className="text-sm text-gray-600">
+                              Specialty: {slot.specialty || "Unknown Specialty"}
+                            </h3>
+                            <p className="text-sm text-gray-600">
+                              {new Date(slot.start_time).toLocaleString()} -{" "}
+                              {new Date(slot.end_time).toLocaleString()}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              // 跳转到预约页面，并传递选中的时间段信息
+                              // router.push(`/appointments/new?slotId=${slot.id}`);
+                              handleBookAppointment(slot, user?.id || 0);
+                            }}
+                          >
+                            Book Appointment
+                          </Button>
                         </div>
-                        <Button size="sm" onClick={() => {
-                          // 跳转到预约页面，并传递选中的时间段信息
-                          // router.push(`/appointments/new?slotId=${slot.id}`);
-                          handleBookAppointment(slot, user?.id || 0)
-                        }}>
-                          Book Appointment
-                        </Button>
-                      </div>
-                    ))
+                      ))
                   ) : (
-                    <div className="text-center py-8">
-                      <p className="text-gray-500">
-                        No available time slots found.
-                      </p>
+                    <div className="text-center text-gray-500">
+                      No available slots found.
                     </div>
                   )}
                 </div>
@@ -359,7 +428,7 @@ export default function AppointmentsPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => router.push('/appointments/new')}
+                    onClick={() => router.push("/appointments/new")}
                   >
                     New Appointment
                   </Button>
@@ -381,61 +450,94 @@ export default function AppointmentsPage() {
                 {/* Appointments List */}
                 <div className="space-y-4">
                   {filteredAppointments.length > 0 ? (
-                    filteredAppointments.map((appointment, index) => {
-                      const { date, time } = formatDateTime(appointment.date_time)
-                      const status = getAppointmentStatus(appointment)
+                    filteredAppointments
+                      .filter((appt) => !appt.cancelled)
+                      .map((appointment, index) => {
+                        const { date, time } = formatDateTime(
+                          appointment.date_time,
+                        );
+                        const status = getAppointmentStatus(appointment);
 
-                      return (
-                        <Card key={appointment.id} className="shadow">
-                          <CardHeader className="pb-3">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <CardTitle className="text-lg">{appointment.provider_name}</CardTitle>
-                                <CardDescription>{appointment.consultation_type}</CardDescription>
+                        return (
+                          <Card
+                            key={appointment.id}
+                            className={`shadow transition-all duration-300 ${
+                              cancellingIds.has(appointment.id)
+                                ? "opacity-50 scale-[0.98]"
+                                : "opacity-100 scale-100"
+                            }`}
+                          >
+                            <CardHeader className="pb-3">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <CardTitle className="text-lg">
+                                    {appointment.provider_name}
+                                  </CardTitle>
+                                  <CardDescription>
+                                    {appointment.consultation_type}
+                                  </CardDescription>
+                                </div>
+                                <span
+                                  className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                    status === "upcoming"
+                                      ? "bg-blue-100 text-blue-800"
+                                      : status === "completed"
+                                        ? "bg-green-100 text-green-800"
+                                        : "bg-red-100 text-red-800"
+                                  }`}
+                                >
+                                  {status.charAt(0).toUpperCase() +
+                                    status.slice(1)}
+                                </span>
                               </div>
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${status === 'upcoming'
-                                ? 'bg-blue-100 text-blue-800'
-                                : status === 'completed'
-                                  ? 'bg-green-100 text-green-800'
-                                  : 'bg-red-100 text-red-800'
-                                }`}>
-                                {status.charAt(0).toUpperCase() + status.slice(1)}
-                              </span>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="flex justify-between items-center">
-                              <div>
-                                <p className="font-medium">{date}</p>
-                                <p className="text-gray-600">{time}</p>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <p className="font-medium">{date}</p>
+                                  <p className="text-gray-600">{time}</p>
+                                </div>
+                                <div className="flex gap-2">
+                                  {status === "upcoming" && (
+                                    <>
+                                      <Button variant="outline" size="sm">
+                                        Reschedule
+                                      </Button>
+                                      <Button
+                                        variant="destructive"
+                                        size="sm"
+                                        onClick={() =>
+                                          handleCancelAppointment(
+                                            appointment.id,
+                                          )
+                                        }
+                                        // disabled={isLoading(`cancelAppointment-${appointment.id}`)}
+                                      >
+                                        {isLoading(
+                                          `cancelAppointment-${appointment.id}`,
+                                        )
+                                          ? "Cancelling..."
+                                          : "Cancel"}
+                                      </Button>
+                                    </>
+                                  )}
+                                  <Button variant="outline" size="sm">
+                                    View Details
+                                  </Button>
+                                </div>
                               </div>
-                              <div className="flex gap-2">
-                                {status === 'upcoming' && (
-                                  <>
-                                    <Button variant="outline" size="sm">Reschedule</Button>
-                                    <Button
-                                      variant="destructive"
-                                      size="sm"
-                                      onClick={() => handleCancelAppointment(appointment.id)}
-                                    // disabled={isLoading(`cancelAppointment-${appointment.id}`)}
-                                    >
-                                      {isLoading(`cancelAppointment-${appointment.id}`) ? 'Cancelling...' : 'Cancel'}
-                                    </Button>
-                                  </>
-                                )}
-                                <Button variant="outline" size="sm">View Details</Button>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )
-                    })
+                            </CardContent>
+                          </Card>
+                        );
+                      })
                   ) : (
                     <div className="text-center py-12">
-                      <p className="text-gray-500">No appointments found matching your search.</p>
+                      <p className="text-gray-500">
+                        No appointments found matching your search.
+                      </p>
                       <Button
                         className="mt-4"
-                        onClick={() => router.push('/appointments/new')}
+                        onClick={() => router.push("/appointments/new")}
                       >
                         Book Your First Appointment
                       </Button>
@@ -448,5 +550,5 @@ export default function AppointmentsPage() {
         </div>
       </main>
     </div>
-  )
+  );
 }

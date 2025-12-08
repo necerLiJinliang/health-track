@@ -459,7 +459,11 @@ def create_family_group(
 
 
 def add_member_to_family_group(
-    db: Session, family_group_id: int, user_id: int, role: str = "member"
+    db: Session,
+    family_group_id: int,
+    user_id: int,
+    role: str = "member",
+    user_name: str = "",
 ):
     # Check if the user is already a member
     existing_member = (
@@ -470,12 +474,13 @@ def add_member_to_family_group(
         )
         .first()
     )
+    print(user_id)
     if existing_member:
         return False
 
     # Create a new family group member record with role
     family_group_member = models.FamilyGroupMember(
-        family_group_id=family_group_id, user_id=user_id, role=role
+        family_group_id=family_group_id, user_id=user_id, role=role, user_name=user_name
     )
     db.add(family_group_member)
     db.commit()
@@ -506,6 +511,28 @@ def get_family_groups_by_user_id(db: Session, user_id: int):
         # Get family groups through family_group_memberships
         return [membership.family_group for membership in user.family_group_memberships]
     return []
+
+
+def get_family_members(db: Session, family_group_id: int):
+    family_group = get_family_group_by_id(db, family_group_id)
+    if not family_group:
+        return []
+    members = family_group.family_group_members  # This gives FamilyGroupMember objects
+    ids = [member.user_id for member in members]
+    user_names = [
+        db.query(models.User).filter(models.User.id == uid).first().name for uid in ids
+    ]
+    members_expanded = []
+    for i, member in enumerate(members):
+        member_data = {
+            "id": member.id,
+            "user_id": member.user_id,
+            "role": member.role,
+            "joined_at": member.joined_at,
+            "user_name": user_names[i],
+        }
+        members_expanded.append(member_data)
+    return members_expanded
 
 
 # Invitation CRUD operations

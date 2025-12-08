@@ -16,14 +16,14 @@ const getAuthFetchOptions = (options: RequestInit = {}) => {
     ...options,
     headers: token
       ? {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        ...options.headers,
-      }
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          ...options.headers,
+        }
       : {
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
+          "Content-Type": "application/json",
+          ...options.headers,
+        },
   };
 };
 
@@ -256,8 +256,6 @@ export const createProvider = async (providerData: ProviderData) => {
   return response.json();
 };
 
-
-
 // Appointment API
 export const createAppointment = async (
   appointmentData: AppointmentData,
@@ -377,7 +375,7 @@ export const getChallenges = async () => {
   //   created_at: challenge.created_at,
   //   participants: challenge.participants || [],
   // }));
-  return challengesData
+  return challengesData;
 };
 
 export const joinChallenge = async (challengeId: number, userId: number) => {
@@ -410,7 +408,10 @@ export const getChallengeParticipants = async (challengeId: number) => {
   return response.json();
 };
 
-export const addChallengeParticipant = async (challengeId: number, userId: number) => {
+export const addChallengeParticipant = async (
+  challengeId: number,
+  userId: number,
+) => {
   const response = await fetch(
     `${API_BASE_URL}/challenges/${challengeId}/participants/${userId}`,
     getAuthFetchOptions({
@@ -431,7 +432,10 @@ interface FamilyGroupData {
 }
 
 // Family Group API
-export const createFamilyGroup = async (familyGroupData: FamilyGroupData, userId: number) => {
+export const createFamilyGroup = async (
+  familyGroupData: FamilyGroupData,
+  userId: number,
+) => {
   const response = await fetch(
     `${API_BASE_URL}/family_groups/${userId}`,
     getAuthFetchOptions({
@@ -460,19 +464,21 @@ export const getFamilyGroups = async (userId: number) => {
   }
 
   const familyGroupsData = await response.json();
-  return familyGroupsData.map((group: any) => ({
-    id: group.id,
-    group_id: group.group_id,
-    name: group.name,
-    creator_id: group.creator_id,
-    created_at: group.created_at,
-    members: group.members || [],
-  }));
+  return familyGroupsData;
+  // return familyGroupsData.map((group: any) => ({
+  //   id: group.id,
+  //   group_id: group.group_id,
+  //   name: group.name,
+  //   creator_id: group.creator_id,
+  //   created_at: group.created_at,
+  //   family_group_members: group.family_group_members || [],
+  // }));
 };
 
 interface FamilyMemberData {
   user_id: number;
   role: string;
+  user_name: string;
 }
 
 export const addFamilyMember = async (
@@ -612,14 +618,14 @@ interface ProviderAvailabilityData {
 }
 
 export const createProviderAvailability = async (
-  availabilityData: ProviderAvailabilityData
+  availabilityData: ProviderAvailabilityData,
 ) => {
   const response = await fetch(
     `${API_BASE_URL}/providers-availability/`,
     getAuthFetchOptions({
       method: "POST",
       body: JSON.stringify(availabilityData),
-    })
+    }),
   );
 
   if (!response.ok) {
@@ -634,7 +640,7 @@ export const getProviderAvailabilities = async (providerId: number) => {
     `${API_BASE_URL}/providers-availability/${providerId}`,
     getAuthFetchOptions({
       method: "GET",
-    })
+    }),
   );
 
   if (!response.ok) {
@@ -649,7 +655,7 @@ export const getAvailableProviderSlots = async (providerId: number) => {
     `${API_BASE_URL}/providers-availability/${providerId}/available`,
     getAuthFetchOptions({
       method: "GET",
-    })
+    }),
   );
 
   if (!response.ok) {
@@ -664,7 +670,7 @@ export const getAllProvidersAvailableSlots = async () => {
     `${API_BASE_URL}/providers-availability/all/available`,
     getAuthFetchOptions({
       method: "GET",
-    })
+    }),
   );
 
   if (!response.ok) {
@@ -679,7 +685,7 @@ export const deleteProviderAvailability = async (availabilityId: number) => {
     `${API_BASE_URL}/providers-availability/${availabilityId}`,
     getAuthFetchOptions({
       method: "DELETE",
-    })
+    }),
   );
 
   if (!response.ok) {
@@ -689,13 +695,16 @@ export const deleteProviderAvailability = async (availabilityId: number) => {
   return response.json();
 };
 
-export const bookAppointment = async (appointmentData: AppointmentData, user_id: number) => {
+export const bookAppointment = async (
+  appointmentData: AppointmentData,
+  user_id: number,
+) => {
   const response = await fetch(
     `${API_BASE_URL}/appointments/?user_id=${user_id}`,
     getAuthFetchOptions({
       method: "POST",
       body: JSON.stringify(appointmentData),
-    })
+    }),
   );
 
   if (!response.ok) {

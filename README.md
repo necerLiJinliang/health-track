@@ -1,6 +1,6 @@
 # HealthTrack Personal Wellness Platform - Frontend
 
-This is the frontend application for the HealthTrack Personal Wellness Platform, built with Next.js, TypeScript, Tailwind CSS, and shadcn/ui components.
+This is the frontend application for the HealthTrack Personal Wellness Platform, built with Next.js, TypeScript, Tailwind CSS, and shadcn/ui components. The backend is FastAPI.
 
 ## Project Overview
 
@@ -28,42 +28,129 @@ HealthTrack is a personal health and wellness management platform that allows us
 - **UI Components**: shadcn/ui
 - **State Management**: React Context API (built-in with Next.js)
 
-## Project Structure
-
-```
-src/
-├── app/                 # Next.js app router pages
-│   ├── appointments/    # Appointment management pages
-│   ├── challenges/      # Wellness challenge pages
-│   ├── profile/         # User profile pages
-│   ├── login/          # Authentication pages
-│   ├── register/       # Registration pages
-│   ├── dashboard/      # Main dashboard
-│   └── page.tsx        # Home page
-├── components/         # Reusable UI components
-│   └── ui/             # shadcn/ui components
-└── lib/                # Utility functions
-```
-
-## Getting Started
-
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
-
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+
+## 目录结构
+
+```
+.
+├── README.md
+├── backend
+│   ├── README.md
+│   ├── __init__.py
+│   ├── crud.py
+│   ├── database.db
+│   ├── database.py
+│   ├── healthtrack.db
+│   ├── init_db.py
+│   ├── main.py
+│   ├── models.py
+│   ├── pyproject.toml
+│   ├── requirements.txt
+│   ├── routers
+│   ├── sample_data.py
+│   ├── schemas.py
+│   ├── test_api.py
+│   └── uv.lock
+├── public
+├── src
+│   ├── app
+│   ├── components
+│   ├── contexts
+│   ├── lib
+```
+
+
+## 路由与页面
+
+- `/` - 首页
+- `/login` - 登录
+- `/register` - 注册
+- `/dashboard` - 仪表盘
+- `/appointments` - 预约列表
+- `/appointments/new` - 新建预约
+- `/challenges` - 挑战列表
+- `/challenges/new` - 新建挑战
+- `/profile` - 个人档案
+- `/familyGroup` - 家庭成员管理
+- `/messages` - 消息中心
+
+## 开发与启动
+推荐Python版本3.9+
+
+1. 克隆仓库：
+
+```bash
+git clone xxx
+```
+
+2. 进入项目目录：
+
+```bash
+cd health-track-front
+```
+
+3. 配置后端
+- 进入 backend 目录：
+
+```bash
+cd backend
+```
+
+- 创建并激活虚拟环境：
+
+使用uv：
+```bash
+uv venv 
+source venv/bin/activate  # Linux/Mac
+venv\Scripts\activate     # Windows
+# - 安装依赖：
+uv pip install -r requirements.txt
+```
+
+使用conda：
+```bash
+conda create -n healthtrack_env python=3.9 -y
+conda activate healthtrack_env
+pip install -r requirements.txt
+```
+- 初始化数据库并添加示例数据：
+
+```bash
+python init_db.py
+```
+
+4. 配置前端
+
+- 返回项目根目录：
+
+```bash
+cd ..
+```
+
+- 安装依赖：
+
+```bash
+npm install
+```
+
+5. 启动开发服务器：
+
+```bash
+# 启动后端服务器
+cd backend
+# 在 backend 目录下运行：
+uv uvicorn main:app --reload
+
+# 启动前端服务器
+# 在项目根目录下运行：
+npm run dev
+```
+
 
 ## Available Pages
 

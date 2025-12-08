@@ -56,7 +56,7 @@ export interface FamilyGroup {
   name: string;
   creator_id: number;
   created_at: string;
-  members: FamilyMember[];
+  family_group_members: FamilyMember[];
 }
 
 export interface FamilyMember {
@@ -65,6 +65,7 @@ export interface FamilyMember {
   family_group_id: number;
   role: string;
   joined_at: string;
+  user_name: string;
 }
 
 export interface ProviderAvailability {
@@ -85,25 +86,25 @@ export interface AppointmentData {
 }
 
 export interface Slot {
-  id: number
-  provider_id: number
-  name: string
-  specialty: string
-  start_time: string
-  end_time: string
+  id: number;
+  provider_id: number;
+  name: string;
+  specialty: string;
+  start_time: string;
+  end_time: string;
 }
 
 export interface Appointment {
-  id: number
-  appointment_id: string
-  provider_id: number
-  date_time: string
-  consultation_type: string
-  notes: string | null
-  cancelled: boolean
-  cancellation_reason: string | null
-  created_at: string
-  user_id: number
-  user_name: string
-  provider_name: string
+  id: number;
+  appointment_id: string;
+  provider_id: number;
+  date_time: string;
+  consultation_type: string;
+  notes: string | null;
+  cancelled: boolean;
+  cancellation_reason: string | null;
+  created_at: string;
+  user_id: number;
+  user_name: string;
+  provider_name: string;
 }

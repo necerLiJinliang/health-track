@@ -127,6 +127,7 @@ class Challenge(Base):
     start_date = Column(DateTime)
     end_date = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
+    progress = Column(Integer, default=0)  # e.g., JSON string to track progress
 
     # Relationships
     creator = relationship(
@@ -160,6 +161,7 @@ class FamilyGroupMember(Base):
     id = Column(Integer, primary_key=True, index=True)
     family_group_id = Column(Integer, ForeignKey("family_groups.id"))
     user_id = Column(Integer, ForeignKey("users.id"))
+    user_name = Column(String)
     role = Column(String, default="member")  # member, caregiver, admin
     joined_at = Column(DateTime, default=datetime.utcnow)
 

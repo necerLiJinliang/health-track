@@ -115,6 +115,7 @@ class Challenge(ChallengeBase):
     id: int
     creator_id: Optional[int] = None
     created_at: datetime
+    progress: int = 0
 
     class Config:
         from_attributes = True
@@ -141,6 +142,7 @@ class FamilyGroupMember(FamilyGroupMemberBase):
     id: int
     family_group_id: int
     user_id: int
+    user_name: str
     joined_at: datetime
 
     class Config:

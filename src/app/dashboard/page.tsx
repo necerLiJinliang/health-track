@@ -11,13 +11,14 @@ import {
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useInsertionEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { getUserAppointments } from "@/lib/api";
+import { getUserAppointments, getChallenges } from "@/lib/api";
 import { Appointment } from "@/types";
 
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [challenges, setChallenges] = useState<any[]>([]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -33,6 +34,21 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchAppointments();
   }, [user]);
+
+  useEffect(() => {
+    const fetchChallenges = async () => {
+      try {
+        const list = await getChallenges();
+        setChallenges(list || []);
+      } catch (e) {
+        // silently ignore for dashboard
+        console.error("Failed to fetch challenges", e);
+      }
+    };
+    if (isAuthenticated) {
+      fetchChallenges();
+    }
+  }, [isAuthenticated]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -62,37 +78,70 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {appointments.length === 0 ? (
-                  <div className="text-gray-500 text-sm">
-                    No upcoming appointments.
-                  </div>
-                ) : (
-                  appointments.map((appointment, idx) => (
-                    <div
-                      key={idx}
-                      className={`border-l-4 ${
-                        idx % 2 === 0 ? "border-blue-500" : "border-green-500"
-                      } pl-4 py-1`}
-                    >
-                      <h3 className="font-medium">{appointment.doctorName}</h3>
-                      <p className="text-sm text-gray-600">
-                        {appointment.type}
-                      </p>
-                      <p className="text-sm">
-                        {new Date(appointment.dateTime).toLocaleString(
-                          "en-US",
-                          {
+                {(() => {
+                  const now = new Date();
+                  const sevenDaysLater = new Date(
+                    now.getFullYear(),
+                    now.getMonth(),
+                    now.getDate() + 7,
+                  );
+
+                  const normalizeDate = (a: any) => {
+                    const raw = a?.date_time ?? a?.dateTime;
+                    return raw ? new Date(raw) : null;
+                  };
+
+                  const upcoming = appointments
+                    .filter((a: any) => !a?.cancelled)
+                    .map((a: any) => ({ ...a, _dt: normalizeDate(a) }))
+                    .filter(
+                      (a: any) =>
+                        a._dt && a._dt >= now && a._dt <= sevenDaysLater,
+                    )
+                    .sort((a: any, b: any) => a._dt.getTime() - b._dt.getTime())
+                    .slice(0, 5);
+
+                  if (upcoming.length === 0) {
+                    return (
+                      <div className="text-gray-500 text-sm">
+                        No upcoming appointments.
+                      </div>
+                    );
+                  }
+
+                  return upcoming.map((appointment: any, idx: number) => {
+                    const dt: Date = appointment._dt;
+                    const providerName =
+                      appointment?.provider_name ||
+                      appointment?.provider?.name ||
+                      "Provider";
+                    const type =
+                      appointment?.consultation_type ||
+                      appointment?.type ||
+                      "Consultation";
+
+                    return (
+                      <div
+                        key={idx}
+                        className={`border-l-4 ${
+                          idx % 2 === 0 ? "border-blue-500" : "border-green-500"
+                        } pl-4 py-1`}
+                      >
+                        <h3 className="font-medium">{providerName}</h3>
+                        <p className="text-sm text-gray-600">{type}</p>
+                        <p className="text-sm">
+                          {dt.toLocaleString("en-US", {
                             weekday: "short",
                             month: "short",
                             day: "numeric",
                             hour: "2-digit",
                             minute: "2-digit",
-                          },
-                        )}
-                      </p>
-                    </div>
-                  ))
-                )}
+                          })}
+                        </p>
+                      </div>
+                    );
+                  });
+                })()}
                 <Button
                   variant="outline"
                   className="w-full"
@@ -113,16 +162,62 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="border-l-4 border-green-500 pl-4 py-1">
-                  <h3 className="font-medium">10K Steps Daily</h3>
-                  <p className="text-sm text-gray-600">With Family Group</p>
-                  <p className="text-sm">3 days remaining</p>
-                </div>
-                <div className="border-l-4 border-purple-500 pl-4 py-1">
-                  <h3 className="font-medium">Hydration Goal</h3>
-                  <p className="text-sm text-gray-600">Personal Challenge</p>
-                  <p className="text-sm">7 days remaining</p>
-                </div>
+                {(() => {
+                  const now = new Date();
+                  const active = (challenges || [])
+                    .filter((c: any) => {
+                      const start = new Date(c.start_date);
+                      const end = new Date(c.end_date);
+                      return start <= now && end >= now;
+                    })
+                    .sort(
+                      (a: any, b: any) =>
+                        new Date(a.end_date).getTime() -
+                        new Date(b.end_date).getTime(),
+                    )
+                    .slice(0, 5);
+
+                  if (active.length === 0) {
+                    return (
+                      <div className="text-gray-500 text-sm">
+                        No active challenges.
+                      </div>
+                    );
+                  }
+
+                  return active.map((c: any, idx: number) => {
+                    const end = new Date(c.end_date);
+                    const msRemaining = end.getTime() - now.getTime();
+                    const daysRemaining = Math.max(
+                      0,
+                      Math.ceil(msRemaining / (1000 * 60 * 60 * 24)),
+                    );
+                    const borderColors = [
+                      "border-green-500",
+                      "border-purple-500",
+                      "border-blue-500",
+                    ];
+                    const color = borderColors[idx % borderColors.length];
+
+                    return (
+                      <div
+                        className={`border-l-4 ${color} pl-4 py-1`}
+                        key={c.id}
+                      >
+                        <h3 className="font-medium">{c.goal}</h3>
+                        <p className="text-sm text-gray-600">
+                          {`Start: ${new Date(c.start_date).toLocaleDateString()} • End: ${new Date(
+                            c.end_date,
+                          ).toLocaleDateString()}`}
+                        </p>
+                        <p className="text-sm">
+                          {daysRemaining} day{daysRemaining !== 1 ? "s" : ""}{" "}
+                          remaining
+                        </p>
+                      </div>
+                    );
+                  });
+                })()}
                 <Button
                   variant="outline"
                   className="w-full"
@@ -164,6 +259,124 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+
+        <Card className="border-gray-200 shadow mb-8">
+          <CardHeader>
+            <CardTitle className="text-gray-800">Summary</CardTitle>
+            <CardDescription>
+              Overview of appointments, metrics, and activity
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {(() => {
+              // Date range: last 30 days
+              const now = new Date();
+              const from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+              // Appointments count within date range for current user
+              const apptInRangeCount = (appointments || []).filter((a: any) => {
+                const dtRaw = a?.date_time ?? a?.dateTime;
+                if (!dtRaw) return false;
+                const dt = new Date(dtRaw);
+                return !a?.cancelled && dt >= from && dt <= now;
+              }).length;
+
+              // Monthly health metric stats placeholders (no metrics data available here)
+              const metricStats = {
+                weight: { avg: "N/A", min: "N/A", max: "N/A" },
+                bloodPressure: { avg: "N/A", min: "N/A", max: "N/A" },
+              };
+
+              // Most participated challenge (by participants count)
+              const mostParticipatedChallenge = (challenges || []).reduce(
+                (best: any, c: any) => {
+                  const count = Array.isArray(c?.participants)
+                    ? c.participants.length
+                    : typeof c?.participants === "number"
+                      ? c.participants
+                      : 0;
+                  if (!best || count > best.count) {
+                    return { id: c?.id, goal: c?.goal, count };
+                  }
+                  return best;
+                },
+                null as null | { id: number; goal: string; count: number },
+              );
+
+              // Most active user placeholder (no cross-user activity data available in this view)
+              const mostActiveUser = { name: "N/A", detail: "Not available" };
+
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="border rounded-lg p-4">
+                    <h4 className="font-semibold mb-2">
+                      Appointments (Last 30 days)
+                    </h4>
+                    <p className="text-sm text-gray-600">
+                      Total appointments:{" "}
+                      <span className="font-medium">{apptInRangeCount}</span>
+                    </p>
+                  </div>
+
+                  <div className="border rounded-lg p-4">
+                    <h4 className="font-semibold mb-2">
+                      Monthly Health Metrics
+                    </h4>
+                    <div className="text-sm text-gray-600 space-y-1">
+                      <div>
+                        <span className="font-medium">Weight:</span> avg{" "}
+                        {metricStats.weight.avg}, min {metricStats.weight.min},
+                        max {metricStats.weight.max}
+                      </div>
+                      <div>
+                        <span className="font-medium">Blood Pressure:</span> avg{" "}
+                        {metricStats.bloodPressure.avg}, min{" "}
+                        {metricStats.bloodPressure.min}, max{" "}
+                        {metricStats.bloodPressure.max}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border rounded-lg p-4">
+                    <h4 className="font-semibold mb-2">
+                      Most Participated Challenge
+                    </h4>
+                    {mostParticipatedChallenge ? (
+                      <div className="text-sm text-gray-600">
+                        <div>
+                          <span className="font-medium">Goal:</span>{" "}
+                          {mostParticipatedChallenge.goal || "Untitled"}
+                        </div>
+                        <div>
+                          <span className="font-medium">Participants:</span>{" "}
+                          {mostParticipatedChallenge.count}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500">
+                        No challenge data available.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="border rounded-lg p-4">
+                    <h4 className="font-semibold mb-2">Most Active User</h4>
+                    <div className="text-sm text-gray-600">
+                      <div>
+                        <span className="font-medium">User:</span>{" "}
+                        {mostActiveUser.name}
+                      </div>
+                      <div>
+                        <span className="font-medium">Detail:</span>{" "}
+                        {mostActiveUser.detail}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>

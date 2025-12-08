@@ -56,7 +56,9 @@ export default function ProfilePage() {
   const { user, isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState("profile");
   const [providers, setProviders] = useState<Provider[]>([]);
-  const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState<Provider | null>(
+    null,
+  );
   const [userInfo, setUserInfo] = useState<User>({} as User);
   const [userEmails, setUserEmails] = useState<Email[]>([]);
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
@@ -287,13 +289,13 @@ export default function ProfilePage() {
                 >
                   Contact Information
                 </Button>
-                <Button
+                {/*<Button
                   variant={activeTab === "family" ? "default" : "ghost"}
                   className={`w-full justify-start ${activeTab === "family" ? "bg-blue-100 text-blue-700 hover:bg-blue-100" : ""}`}
                   onClick={() => setActiveTab("family")}
                 >
                   Family Group
-                </Button>
+                </Button>*/}
               </CardContent>
             </Card>
           </div>
