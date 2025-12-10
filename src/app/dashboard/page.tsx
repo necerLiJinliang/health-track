@@ -11,7 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useInsertionEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { getUserAppointments, getChallenges } from "@/lib/api";
+import { getUserAppointments, getChallenges, getUserInfo } from "@/lib/api";
 import { Appointment } from "@/types";
 
 export default function DashboardPage() {
@@ -38,8 +38,37 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchChallenges = async () => {
       try {
-        const list = await getChallenges(user?.id || 0);
-        setChallenges(list || []);
+        const challengesData = await getChallenges(user?.id || 0);
+        const creator_id: number[] = [];
+        challengesData.forEach((challenge: any) => {
+          if (!creator_id.includes(challenge.creator_id)) {
+            creator_id.push(challenge.creator_id);
+          }
+        });
+        const creator_names: string[] = [];
+        for (let i = 0; i < creator_id.length; i++) {
+          const userData = await getUserInfo(creator_id[i]);
+          creator_names.push(userData.name || "Unknown");
+        }
+
+        // 转换数据格式以匹配前端需求
+        const formattedChallenges = challengesData.map(
+          (challenge: any, idx: number) => ({
+            ...challenge,
+            id: challenge.id,
+            title: challenge.title || "Untitled Challenge",
+            creator: "You", // 这里应该从后端获取创建者信息
+            creator_id: challenge.creator_id,
+            creator_name: creator_names[idx],
+            goal: challenge.goal || "No goal specified",
+            startDate: new Date(challenge.start_date).toLocaleDateString(),
+            endDate: new Date(challenge.end_date).toLocaleDateString(),
+            participants: challenge.participants?.length || 1,
+            progress: challenge.progress, // 临时随机进度，实际应该从后端获取
+            status: "active", // 临时状态，实际应该根据日期计算
+          }),
+        );
+        setChallenges(formattedChallenges || []);
       } catch (e) {
         // silently ignore for dashboard
         console.error("Failed to fetch challenges", e);
@@ -165,11 +194,11 @@ export default function DashboardPage() {
                 {(() => {
                   const now = new Date();
                   const active = (challenges || [])
-                    .filter((c: any) => {
-                      const start = new Date(c.start_date);
-                      const end = new Date(c.end_date);
-                      return start <= now && end >= now;
-                    })
+                    // .filter((c: any) => {
+                    //   const start = new Date(c.start_date);
+                    //   const end = new Date(c.end_date);
+                    //   return start <= now && end >= now;
+                    // })
                     .sort(
                       (a: any, b: any) =>
                         new Date(a.end_date).getTime() -
@@ -204,7 +233,9 @@ export default function DashboardPage() {
                         className={`border-l-4 ${color} pl-4 py-1`}
                         key={c.id}
                       >
-                        <h3 className="font-medium">{c.goal}</h3>
+                        <h3 className="font-medium">
+                          {c.title} {c.goal}
+                        </h3>
                         <p className="text-sm text-gray-600">
                           {`Start: ${new Date(c.start_date).toLocaleDateString()} • End: ${new Date(
                             c.end_date,
@@ -296,7 +327,7 @@ export default function DashboardPage() {
                       ? c.participants
                       : 0;
                   if (!best || count > best.count) {
-                    return { id: c?.id, goal: c?.goal, count };
+                    return { id: c?.id, goal: c?.goal, title: c?.title, count };
                   }
                   return best;
                 },
@@ -343,6 +374,10 @@ export default function DashboardPage() {
                     </h4>
                     {mostParticipatedChallenge ? (
                       <div className="text-sm text-gray-600">
+                        <div>
+                          <span className="font-medium">Title:</span>{" "}
+                          {mostParticipatedChallenge.title || "Untitled"}
+                        </div>
                         <div>
                           <span className="font-medium">Goal:</span>{" "}
                           {mostParticipatedChallenge.goal || "Untitled"}

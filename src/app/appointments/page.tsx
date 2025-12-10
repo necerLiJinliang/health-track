@@ -33,6 +33,8 @@ export default function AppointmentsPage() {
   const [filteredAppointments, setFilteredAppointments] = useState<
     Appointment[]
   >([]);
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
   const [providers, setProviders] = useState<Provider[]>([]);
   const [availableSlots, setAvailableSlots] = useState<Slot[]>([]);
   const [showAvailableSlots, setShowAvailableSlots] = useState(false);
@@ -170,15 +172,36 @@ export default function AppointmentsPage() {
     setError,
   ]);
 
-  // 根据搜索词过滤预约
+  // 根据关键词与日期范围过滤预约
   useEffect(() => {
-    // const filtered = appointments.filter(appointment =>
-    //   appointment.provider.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    //   appointment.consultation_type.toLowerCase().includes(searchTerm.toLowerCase())
-    // )
-    const filtered = appointments;
+    const term = searchTerm.trim().toLowerCase();
+    const sd = startDate ? new Date(`${startDate}T00:00:00`) : null;
+    const ed = endDate ? new Date(`${endDate}T23:59:59.999`) : null;
+
+    const filtered = appointments.filter((appointment) => {
+      // 关键词匹配：提供者名称、专科、用户名、就诊类型、备注
+      const haystack = [
+        appointment.provider_name,
+        (appointment as any).provider_specialty,
+        (appointment as any).user_name,
+        (appointment as any).consultation_type,
+        (appointment as any).notes,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      const matchesTerm = term ? haystack.includes(term) : true;
+
+      // 日期范围匹配（包含端点）
+      const dt = new Date(appointment.date_time);
+      const inRange = (!sd || dt >= sd) && (!ed || dt <= ed);
+
+      return matchesTerm && inRange;
+    });
+
     setFilteredAppointments(filtered);
-  }, [searchTerm, appointments]);
+  }, [searchTerm, startDate, endDate, appointments]);
 
   // 格式化日期时间显示
   const formatDateTime = (dateTimeStr: string) => {
@@ -445,13 +468,28 @@ export default function AppointmentsPage() {
               <CardContent>
                 {/* Search and Filter */}
                 <div className="mb-6">
-                  <div className="flex gap-4">
+                  <div className="flex flex-col md:flex-row gap-4 items-center">
                     <Input
                       placeholder="Search appointments..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full"
+                      className="w-full md:w-auto flex-1"
                     />
+                    <div className="flex gap-2 items-center w-full md:w-auto">
+                      <Input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="w-full md:w-44"
+                      />
+                      <span className="text-gray-500">to</span>
+                      <Input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="w-full md:w-44"
+                      />
+                    </div>
                   </div>
                 </div>
 

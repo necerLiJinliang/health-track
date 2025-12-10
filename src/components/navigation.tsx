@@ -85,7 +85,7 @@ export default function Navigation() {
                 >
                   Family Group
                 </button>
-                <button
+                {/*<button
                   onClick={() => router.push("/messages")}
                   className={`${
                     pathname === "/messages"
@@ -94,7 +94,7 @@ export default function Navigation() {
                   }`}
                 >
                   Messages
-                </button>
+                </button>*/}
                 <button
                   onClick={() => router.push("/profile")}
                   className={`${
