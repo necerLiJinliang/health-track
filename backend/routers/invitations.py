@@ -1,13 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+import os
+import sys
 from typing import List
 
-import sys
-import os
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import crud, models, schemas
+import crud
+import models
+import schemas
 from database import get_db
 
 router = APIRouter(prefix="/invitations", tags=["invitations"])
@@ -39,13 +41,26 @@ def get_user_invitations(user_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{invitation_id}/accept")
-def accept_invitation(invitation_id: int, db: Session = Depends(get_db)):
-    result = crud.accept_invitation(db, invitation_id=invitation_id)
+def accept_invitation(invitation_id: int, user_id: int, db: Session = Depends(get_db)):
+    result = crud.accept_invitation(db, invitation_id=invitation_id, user_id=user_id)
     if not result:
         raise HTTPException(
             status_code=400, detail="Invitation not found, already accepted, or expired"
         )
     return {"message": "Invitation accepted successfully"}
+
+
+@router.put("/challenges/user/{user_id}/{challenge_id")
+def invite_user_to_challenges(
+    user_id: int, challenge_id: int, db: Session = Depends(get_db)
+):
+    invited_challenges = crud.add_participant_to_challenge(
+        db, challenge_id=challenge_id, user_id=user_id
+    )
+    return {
+        "message": f"User {user_id} invited to challenges successfully",
+        "invited_challenges": invited_challenges,
+    }
 
 
 @router.put("/{invitation_id}/reject")

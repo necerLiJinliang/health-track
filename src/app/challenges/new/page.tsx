@@ -125,6 +125,8 @@ export default function NewChallengePage() {
 
       // 构造挑战数据
       const challengeData = {
+        title: title,
+        description: description,
         challenge_id: `CH-${Date.now()}`, // 临时ID，实际应由后端生成
         goal: goal,
         start_date: startDate,

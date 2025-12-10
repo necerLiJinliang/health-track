@@ -26,19 +26,19 @@ export interface Provider {
   created_at: string;
 }
 
-export interface Appointment {
-  id: number;
-  appointment_id: string;
-  user_id: number;
-  provider_id: number;
-  date_time: string;
-  consultation_type: string;
-  notes: string | null;
-  cancelled: boolean;
-  cancellation_reason: string | null;
-  created_at: string;
-  provider: Provider;
-}
+// export interface Appointment {
+//   id: number;
+//   appointment_id: string;
+//   user_id: number;
+//   provider_id: number;
+//   date_time: string;
+//   consultation_type: string;
+//   notes: string | null;
+//   cancelled: boolean;
+//   cancellation_reason: string | null;
+//   created_at: string;
+//   provider: Provider;
+// }
 
 export interface Challenge {
   id: number;
@@ -107,4 +107,5 @@ export interface Appointment {
   user_id: number;
   user_name: string;
   provider_name: string;
+  provider_specialty: string;
 }

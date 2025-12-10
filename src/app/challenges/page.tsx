@@ -11,11 +11,19 @@ import {
 } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { getChallenges, createInvitation } from "@/lib/api";
+import {
+  getChallenges,
+  createInvitation,
+  getUserByEmail,
+  inviteUserToChallenge,
+  getUserByPhone,
+  getUserInfo,
+} from "@/lib/api";
 import { useLoadingManager } from "@/lib/loadingManager";
 import { getErrorMessage } from "@/lib/apiErrorHandler";
 import { useAuth } from "@/contexts/AuthContext";
 import InviteUserModal from "@/components/InviteUserModal";
+import { User } from "@/types";
 
 type Challenge = {
   id: number;
@@ -27,6 +35,8 @@ type Challenge = {
   created_at: string;
   participants: any[];
   progress?: number;
+  title: string;
+  creator_name: string;
   status?: "active" | "completed" | "upcoming";
 };
 
@@ -34,6 +44,8 @@ export default function ChallengesPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loadingStates, { startLoading, stopLoading, isLoading }] =
@@ -59,20 +71,36 @@ export default function ChallengesPage() {
       try {
         // startLoading('fetchChallenges')
         setError(null);
-        const challengesData = await getChallenges();
+        const challengesData = await getChallenges(user?.id);
+        const creator_id: number[] = [];
+        challengesData.forEach((challenge: any) => {
+          if (!creator_id.includes(challenge.creator_id)) {
+            creator_id.push(challenge.creator_id);
+          }
+        });
+        const creator_names: string[] = [];
+        for (let i = 0; i < creator_id.length; i++) {
+          const userData = await getUserInfo(creator_id[i]);
+          creator_names.push(userData.name || "Unknown");
+        }
 
         // 转换数据格式以匹配前端需求
-        const formattedChallenges = challengesData.map((challenge: any) => ({
-          ...challenge,
-          id: challenge.id,
-          title: challenge.goal,
-          creator: "You", // 这里应该从后端获取创建者信息
-          startDate: new Date(challenge.start_date).toLocaleDateString(),
-          endDate: new Date(challenge.end_date).toLocaleDateString(),
-          participants: challenge.participants?.length || 1,
-          progress: challenge.progress, // 临时随机进度，实际应该从后端获取
-          status: "active", // 临时状态，实际应该根据日期计算
-        }));
+        const formattedChallenges = challengesData.map(
+          (challenge: any, idx: number) => ({
+            ...challenge,
+            id: challenge.id,
+            title: challenge.title || "Untitled Challenge",
+            creator: "You", // 这里应该从后端获取创建者信息
+            creator_id: challenge.creator_id,
+            creator_name: creator_names[idx],
+            goal: challenge.goal || "No goal specified",
+            startDate: new Date(challenge.start_date).toLocaleDateString(),
+            endDate: new Date(challenge.end_date).toLocaleDateString(),
+            participants: challenge.participants?.length || 1,
+            progress: challenge.progress, // 临时随机进度，实际应该从后端获取
+            status: "active", // 临时状态，实际应该根据日期计算
+          }),
+        );
 
         setChallenges(formattedChallenges);
       } catch (err: any) {
@@ -86,10 +114,8 @@ export default function ChallengesPage() {
     fetchChallenges();
   }, []);
 
-  const filteredChallenges = challenges.filter(
-    (challenge) =>
-      challenge.goal.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      challenge.creator_id.toString().includes(searchTerm.toLowerCase()),
+  const filteredChallenges = challenges.filter((challenge) =>
+    (challenge.title || "").toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const handleToggleDetails = (id: number) => {
@@ -112,16 +138,44 @@ export default function ChallengesPage() {
     );
   };
 
-  // if (isLoading('fetchChallenges')) {
-  //   return (
-  //     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-  //       <div className="text-center">
-  //         <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-4"></div>
-  //         <p>Loading challenges...</p>
-  //       </div>
-  //     </div>
-  //   )
-  // }
+  const handleApplyDateFilter = async () => {
+    try {
+      setError(null);
+      const params = new URLSearchParams();
+      if (startDate) params.append("start_date", startDate);
+      if (endDate) params.append("end_date", endDate);
+      const res = await fetch(
+        `/challenges/filter-by-date?${params.toString()}`,
+      );
+      if (!res.ok) {
+        throw new Error(`Failed to filter challenges: ${res.statusText}`);
+      }
+      const data = await res.json();
+      // Normalize fields that UI expects
+      const formatted = (Array.isArray(data) ? data : []).map(
+        (challenge: any) => ({
+          ...challenge,
+          id: challenge.id,
+          title: challenge.title || "Untitled Challenge",
+          goal: challenge.goal || "No goal specified",
+          start_date: challenge.start_date,
+          end_date: challenge.end_date,
+          creator_id: challenge.creator_id,
+          creator_name:
+            challenge.creator?.name || challenge.creator_name || "Unknown",
+          participants: Array.isArray(challenge.participants)
+            ? challenge.participants
+            : [],
+          progress: challenge.progress ?? 0,
+          status: challenge.status || "active",
+        }),
+      );
+      setChallenges(formatted);
+    } catch (e: any) {
+      console.error(e);
+      setError(getErrorMessage(e));
+    }
+  };
 
   if (error) {
     return (
@@ -153,14 +207,31 @@ export default function ChallengesPage() {
 
       <main className="container mx-auto px-4 py-8">
         <div className="mb-6">
-          <div className="flex gap-4">
+          <div className="flex flex-wrap gap-4 items-center">
             <Input
-              placeholder="Search challenges..."
+              placeholder="Search by title..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="max-w-md"
             />
-            <Button variant="outline">Filter</Button>
+            <div className="flex gap-2 items-center">
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-40"
+              />
+              <span className="text-gray-500">to</span>
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-40"
+              />
+            </div>
+            <Button variant="outline" onClick={handleApplyDateFilter}>
+              Apply Date Filter
+            </Button>
           </div>
         </div>
 
@@ -170,9 +241,9 @@ export default function ChallengesPage() {
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
                   <div>
-                    <CardTitle className="text-lg">{challenge.goal}</CardTitle>
+                    <CardTitle className="text-lg">{challenge.title}</CardTitle>
                     <CardDescription>
-                      Created by {challenge.creator_id}
+                      Created by {challenge.creator_name}
                     </CardDescription>
                   </div>
                   <span
@@ -330,14 +401,29 @@ export default function ChallengesPage() {
               invitation_type: "challenge",
               challenge_id: challengeId,
             };
+            let userInvited: User[] = [];
             if (method === "email") {
-              payload.recipient_email = value;
+              console.log("Inviting by email:", value);
+              userInvited = await getUserByEmail(value);
             } else {
-              payload.recipient_phone = value;
+              console.log("Inviting by phone:", value);
+              userInvited = await getUserByPhone(value);
+            }
+            console.log("User invited:", userInvited);
+            if (userInvited.length === null) {
+              alert("The email you invited is not registered yet.");
+              return;
+            } else {
+              if (userInvited[0].id == user.id) {
+                alert("You cannot invite yourself.");
+                return;
+              }
             }
             try {
-              await createInvitation(payload, user.id);
-              alert("Invitation sent successfully.");
+              await inviteUserToChallenge(
+                challengeId as number,
+                userInvited[0].id,
+              );
             } catch (e: any) {
               alert(
                 e?.message || "Failed to send invitation. Please try again.",

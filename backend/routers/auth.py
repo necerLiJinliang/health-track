@@ -1,20 +1,22 @@
+import os
+import sys
+from typing import Annotated, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
-from typing import Annotated, Optional
-import sys
-import os
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import crud, schemas
-from database import get_db
 from datetime import datetime, timedelta
+
 from jose import JWTError, jwt
 
-router = APIRouter(
-    prefix="/auth",
-    tags=["auth"]
-)
+import crud
+import schemas
+from database import get_db
+
+router = APIRouter(prefix="/auth", tags=["auth"])
 
 # Secret key for JWT token generation (in production, use environment variables)
 SECRET_KEY = "healthtrack_secret_key_for_jwt_tokens"
@@ -23,16 +25,20 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
+
 class Token(schemas.BaseModel):
     access_token: str
     token_type: str
 
+
 class TokenData(schemas.BaseModel):
     phone_number: Optional[str] = None
+
 
 class LoginRequest(schemas.BaseModel):
     phone_number: str  # Using phone number for login
     password: str
+
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
@@ -44,7 +50,10 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+
+def get_current_user(
+    db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)
+):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -63,10 +72,13 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_
         raise credentials_exception
     return user
 
+
 @router.post("/login", response_model=Token)
 def login_for_access_token(login_request: LoginRequest, db: Session = Depends(get_db)):
     # Using phone number for login
-    user = crud.authenticate_user(db, login_request.phone_number, login_request.password)
+    user = crud.authenticate_user(
+        db, login_request.phone_number, login_request.password
+    )
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -79,11 +91,13 @@ def login_for_access_token(login_request: LoginRequest, db: Session = Depends(ge
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
+
 @router.post("/logout")
 def logout():
     # In a real application, you might want to invalidate the token
     # For now, we'll just return a success message
     return {"message": "Successfully logged out"}
+
 
 @router.get("/me", response_model=schemas.User)
 def read_users_me(current_user: Annotated[schemas.User, Depends(get_current_user)]):

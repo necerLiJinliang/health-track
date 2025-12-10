@@ -128,7 +128,8 @@ class Challenge(Base):
     end_date = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
     progress = Column(Integer, default=0)  # e.g., JSON string to track progress
-
+    title = Column(String)
+    description = Column(String, default="")
     # Relationships
     creator = relationship(
         "User", foreign_keys=[creator_id], back_populates="challenges_created"

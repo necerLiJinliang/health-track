@@ -72,12 +72,6 @@ export default function InviteUserModal({
           ? `Invitation sent to ${value}.`
           : `Invitation SMS sent to ${value}.`,
       );
-      // Optionally reset fields
-      // setEmail("");
-      // setPhone("");
-      // setNote("");
-      // You may choose to auto-close after success:
-      // setTimeout(onClose, 1200);
     } catch (err: any) {
       setError(err?.message || "Failed to send invitation. Please try again.");
     } finally {

@@ -117,6 +117,15 @@ def get_user_by_phone_number(db: Session, phone_number: str):
     )
 
 
+def get_user_by_email_address(db: Session, email_address: str):
+    return (
+        db.query(models.User)
+        .join(models.User.emails)
+        .filter(models.Email.email_address == email_address)
+        .first()
+    )
+
+
 def authenticate_user(db: Session, phone_number: str, password: str):
     user = get_user_by_phone_number(db, phone_number)
     if not user or not user.password_hash:
@@ -399,16 +408,49 @@ def get_challenges(db: Session, skip: int = 0, limit: int = 100):
 
 def create_challenge(db: Session, challenge: schemas.ChallengeCreate, creator_id: int):
     db_challenge = models.Challenge(
+        title=challenge.title,
+        description=challenge.description,
         challenge_id=challenge.challenge_id,
         creator_id=creator_id,
         goal=challenge.goal,
         start_date=challenge.start_date,
         end_date=challenge.end_date,
     )
+    db_user = db.query(models.User).filter(models.User.id == creator_id).first()
+    if db_user:
+        db_challenge.participants.append(db_user)
     db.add(db_challenge)
     db.commit()
     db.refresh(db_challenge)
     return db_challenge
+
+
+def search_challenges_by_title(
+    db: Session, keyword: str, skip: int = 0, limit: int = 100
+):
+    return (
+        db.query(models.Challenge)
+        .filter(models.Challenge.title.ilike(f"%{keyword}%"))
+        .options(joinedload(models.Challenge.creator))
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+
+def filter_challenges_by_date_range(
+    db: Session,
+    start_date: datetime = None,
+    end_date: datetime = None,
+    skip: int = 0,
+    limit: int = 100,
+):
+    query = db.query(models.Challenge).options(joinedload(models.Challenge.creator))
+    if start_date is not None:
+        query = query.filter(models.Challenge.start_date >= start_date)
+    if end_date is not None:
+        query = query.filter(models.Challenge.end_date <= end_date)
+    return query.offset(skip).limit(limit).all()
 
 
 def add_participant_to_challenge(db: Session, challenge_id: int, user_id: int):
@@ -590,7 +632,7 @@ def get_user_invitations(db: Session, user_id: int):
     return invitations
 
 
-def accept_invitation(db: Session, invitation_id: int):
+def accept_invitation(db: Session, invitation_id: int, user_id: int = None):
     db_invitation = (
         db.query(models.Invitation)
         .filter(models.Invitation.id == invitation_id)
@@ -607,6 +649,22 @@ def accept_invitation(db: Session, invitation_id: int):
             db_invitation.is_accepted = True
             db_invitation.accepted_at = datetime.utcnow()
             db_invitation.is_expired = True
+
+            # If this is a challenge invitation and a user_id is provided, add user to challenge participants
+            if (
+                user_id is not None
+                and db_invitation.invitation_type == "challenge"
+                and db_invitation.challenge_id is not None
+            ):
+                challenge = (
+                    db.query(models.Challenge)
+                    .filter(models.Challenge.id == db_invitation.challenge_id)
+                    .first()
+                )
+                user = db.query(models.User).filter(models.User.id == user_id).first()
+                if challenge and user and user not in challenge.participants:
+                    challenge.participants.append(user)
+
             db.commit()
             return True
         else:
@@ -737,9 +795,23 @@ def delete_provider_availability(db: Session, availability_id: int):
 
 
 def get_challenge_by_user(db: Session, user_id: int):
+    # return (
+    #     db.query(models.Challenge)
+    #     .filter(models.Challenge.participants.any(models.User.id == user_id))
+    #     .all()
+    # )
+
+    # return (
+    #     db.query(models.Challenge).options(joinedload(models.Challenge.creator)).all()
+    # )
     return (
         db.query(models.Challenge)
-        .join(models.Challenge.participants)
-        .filter(models.User.id == user_id)
+        # 按参与者包含该 user_id 进行筛选
+        .filter(models.Challenge.participants.any(models.User.id == user_id))
+        # 需要的话，预加载 creator 和 participants，避免 N+1
+        .options(
+            joinedload(models.Challenge.creator),
+            joinedload(models.Challenge.participants),
+        )
         .all()
     )

@@ -1,13 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+import os
+import sys
 from typing import List
 
-import sys
-import os
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import crud, models, schemas
+import crud
+import models
+import schemas
 from database import get_db
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
@@ -48,15 +50,23 @@ def read_appointments(skip: int = 0, limit: int = 100, db: Session = Depends(get
     return appointments
 
 
-@router.get("/user/{user_id}", response_model=List[schemas.Appointment])
+@router.get("/user/{user_id}", response_model=List[schemas.AppointmentExpand])
 def read_user_appointments(user_id: int, db: Session = Depends(get_db)):
     # Verify user exists
     db_user = crud.get_user(db, user_id=user_id)
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
-
+    # 获取Provider的信息
     appointments = crud.get_user_appointments(db, user_id=user_id)
-    return appointments
+    providers_ids = [appt.provider_id for appt in appointments]
+    providers = [crud.get_provider(db, provider_id=pid) for pid in providers_ids]
+    appointments_expanded = []
+    for appt, provider in zip(appointments, providers):
+        appt_data = schemas.Appointment.from_orm(appt).dict()
+        appt_data["provider_name"] = provider.name if provider else None
+        appt_data["provider_specialty"] = provider.specialty if provider else None
+        appointments_expanded.append(appt_data)
+    return appointments_expanded
 
 
 @router.put("/{appointment_id}/cancel")

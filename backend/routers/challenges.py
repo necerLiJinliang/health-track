@@ -1,6 +1,6 @@
 import os
 import sys
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -37,11 +37,9 @@ def read_challenge(challenge_id: int, db: Session = Depends(get_db)):
     return db_challenge
 
 
-@router.get("/user/{user_id}", response_model=schemas.Challenge)
+@router.get("/user/{user_id}", response_model=List[schemas.Challenge])
 def read_user_challenge(user_id: int, db: Session = Depends(get_db)):
     db_challenge = crud.get_challenge_by_user(db, user_id=user_id)
-    if db_challenge is None:
-        raise HTTPException(status_code=404, detail="Challenge for user not found")
     return db_challenge
 
 
@@ -74,3 +72,32 @@ def add_participant_to_challenge(
             detail="User is already a participant or challenge not found",
         )
     return {"message": "Participant added to challenge successfully"}
+
+
+@router.get("/search", response_model=List[schemas.Challenge])
+def search_challenges(
+    keyword: str,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+):
+    return crud.search_challenges_by_title(
+        db=db, keyword=keyword, skip=skip, limit=limit
+    )
+
+
+@router.get("/filter-by-date", response_model=List[schemas.Challenge])
+def filter_challenges_by_date(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+):
+    from datetime import datetime
+
+    sd = datetime.fromisoformat(start_date) if start_date else None
+    ed = datetime.fromisoformat(end_date) if end_date else None
+    return crud.filter_challenges_by_date_range(
+        db=db, start_date=sd, end_date=ed, skip=skip, limit=limit
+    )

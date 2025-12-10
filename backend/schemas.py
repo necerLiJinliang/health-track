@@ -99,12 +99,18 @@ class Appointment(AppointmentBase):
         from_attributes = True
 
 
+class AppointmentExpand(Appointment):
+    provider_specialty: Optional[str] = None
+
+
 # Challenge schemas
 class ChallengeBase(BaseModel):
     challenge_id: str
     goal: str
     start_date: date
     end_date: date
+    title: str
+    description: Optional[str] = ""
 
 
 class ChallengeCreate(ChallengeBase):

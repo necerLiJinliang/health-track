@@ -46,6 +46,35 @@ export const createUser = async (userData: Partial<User>) => {
   return response.json();
 };
 
+export const getUserByEmail = async (email: string) => {
+  const response = await fetch(
+    `${API_BASE_URL}/users/email/${encodeURIComponent(email)}`,
+    getAuthFetchOptions({
+      method: "GET",
+    }),
+  );
+
+  if (!response.ok) {
+    await handleApiError(response);
+  }
+
+  return response.json();
+};
+
+export const getUserByPhone = async (phoneNumber: string) => {
+  const response = await fetch(
+    `${API_BASE_URL}/users/phone/${encodeURIComponent(phoneNumber)}`,
+    getAuthFetchOptions({
+      method: "GET",
+    }),
+  );
+
+  if (!response.ok) {
+    await handleApiError(response);
+  }
+  return response.json();
+};
+
 export const updateUserInfo = async (userData: Partial<User>) => {
   const response = await fetch(
     `${API_BASE_URL}/users/${userData.id}`,
@@ -291,19 +320,20 @@ export const getUserAppointments = async (userId: number) => {
   }
 
   const appointmentsData = await response.json();
-  return appointmentsData.map((appointment: any) => ({
-    id: appointment.id,
-    appointment_id: appointment.appointment_id,
-    user_id: appointment.user_id,
-    provider_id: appointment.provider_id,
-    date_time: appointment.date_time,
-    consultation_type: appointment.consultation_type,
-    notes: appointment.notes,
-    cancelled: appointment.cancelled,
-    cancellation_reason: appointment.cancellation_reason,
-    created_at: appointment.created_at,
-    provider: appointment.provider,
-  }));
+  return appointmentsData;
+  // return appointmentsData.map((appointment: any) => ({
+  //   id: appointment.id,
+  //   appointment_id: appointment.appointment_id,
+  //   user_id: appointment.user_id,
+  //   provider_id: appointment.provider_id,
+  //   date_time: appointment.date_time,
+  //   consultation_type: appointment.consultation_type,
+  //   notes: appointment.notes,
+  //   cancelled: appointment.cancelled,
+  //   cancellation_reason: appointment.cancellation_reason,
+  //   created_at: appointment.created_at,
+  //   provider: appointment.provider,
+  // }));
 };
 
 export const cancelAppointment = async (
@@ -354,9 +384,9 @@ export const createChallenge = async (
   return response.json();
 };
 
-export const getChallenges = async () => {
+export const getChallenges = async (user_id: number) => {
   const response = await fetch(
-    `${API_BASE_URL}/challenges/`,
+    `${API_BASE_URL}/challenges/user/${user_id}`,
     getAuthFetchOptions({
       method: "GET",
     }),
@@ -381,6 +411,24 @@ export const getChallenges = async () => {
 };
 
 export const joinChallenge = async (challengeId: number, userId: number) => {
+  const response = await fetch(
+    `${API_BASE_URL}/challenges/${challengeId}/participants/${userId}`,
+    getAuthFetchOptions({
+      method: "POST",
+    }),
+  );
+
+  if (!response.ok) {
+    await handleApiError(response);
+  }
+
+  return response.json();
+};
+
+export const inviteUserToChallenge = async (
+  challengeId: number,
+  userId: number,
+) => {
   const response = await fetch(
     `${API_BASE_URL}/challenges/${challengeId}/participants/${userId}`,
     getAuthFetchOptions({

@@ -38,7 +38,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchChallenges = async () => {
       try {
-        const list = await getChallenges();
+        const list = await getChallenges(user?.id || 0);
         setChallenges(list || []);
       } catch (e) {
         // silently ignore for dashboard

@@ -85,7 +85,7 @@ export default function AppointmentsPage() {
   // 获取所有Providers的可用时间段
   const fetchAllProvidersAvailableSlots = async () => {
     try {
-      startLoading("fetchAllSlots");
+      // startLoading("fetchAllSlots");
       const slots: Slot[] = await getAllProvidersAvailableSlots();
       console.log("Fetched slots:", slots);
       // 过滤掉已经过去的时间段，只显示当前时间之后的可用时间段
@@ -98,12 +98,12 @@ export default function AppointmentsPage() {
       console.error("Failed to fetch available slots:", err);
       setError(getErrorMessage(err) || "Failed to load available slots");
     } finally {
-      stopLoading("fetchAllSlots");
+      // stopLoading("fetchAllSlots");
     }
   };
   const handleBookAppointment = async (slot: Slot, user_id: number) => {
     try {
-      startLoading("bookAppointment");
+      // startLoading("bookAppointment");
       setError(null);
       const appointmentData: AppointmentData = {
         user_name: user?.name || "",
@@ -124,7 +124,7 @@ export default function AppointmentsPage() {
       // 关闭模态框
       setShowAvailableSlots(false);
     } finally {
-      stopLoading("bookAppointment");
+      // stopLoading("bookAppointment");
     }
   };
   // 获取预约列表
@@ -136,7 +136,15 @@ export default function AppointmentsPage() {
         // 使用认证上下文中的用户ID
         const userId = user?.id || 0;
         const data = await getUserAppointments(userId);
-        setAppointments(data);
+        const appointmentData: Appointment[] = data.map(
+          (appt: Appointment) => ({
+            ...appt,
+            provider_name: appt.provider_name,
+            provider_specialty: appt.provider_specialty,
+          }),
+        );
+        console.log("Fetched appointments:", data[0]);
+        setAppointments(appointmentData);
         setFilteredAppointments(data);
       } catch (err: unknown) {
         console.error("Failed to fetch appointments:", err);
@@ -229,13 +237,13 @@ export default function AppointmentsPage() {
     }
   };
 
-  if (isLoading("fetchAppointments")) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p>Loading appointments...</p>
-      </div>
-    );
-  }
+  // if (isLoading("fetchAppointments")) {
+  //   return (
+  //     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+  //       <p>Loading appointments...</p>
+  //     </div>
+  //   );
+  // }
 
   if (error) {
     return (
@@ -425,13 +433,13 @@ export default function AppointmentsPage() {
                       View and manage your upcoming and past appointments
                     </CardDescription>
                   </div>
-                  <Button
+                  {/*<Button
                     variant="outline"
                     size="sm"
                     onClick={() => router.push("/appointments/new")}
                   >
                     New Appointment
-                  </Button>
+                  </Button>*/}
                 </div>
               </CardHeader>
               <CardContent>
@@ -471,11 +479,14 @@ export default function AppointmentsPage() {
                               <div className="flex justify-between items-start">
                                 <div>
                                   <CardTitle className="text-lg">
-                                    {appointment.provider_name}
+                                    Provider: {appointment.provider_name} (
+                                    {appointment.provider_specialty})
                                   </CardTitle>
-                                  <CardDescription>
-                                    {appointment.consultation_type}
-                                  </CardDescription>
+                                  <CardTitle className="text-lg">
+                                    User: {appointment.user_name}
+                                  </CardTitle>
+                                  {/*<CardDescription>
+                                  </CardDescription>*/}
                                 </div>
                                 <span
                                   className={`px-2 py-1 rounded-full text-xs font-medium ${

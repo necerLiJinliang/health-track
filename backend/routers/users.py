@@ -44,6 +44,22 @@ def read_user(user_id: int, db: Session = Depends(get_db)):
     return db_user
 
 
+@router.get("/emial/{email_address}", response_model=List[schemas.User])
+def read_user_by_email(email_address: str, db: Session = Depends(get_db)):
+    db_user = crud.get_user_by_email_address(db, email_address=email_address)
+    if db_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return db_user
+
+
+@router.get("/phone/{phone_number}", response_model=List[schemas.User])
+def read_user_by_phone(phone_number: str, db: Session = Depends(get_db)):
+    db_user = crud.get_user_by_phone_number(db, phone_number=phone_number)
+    if db_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return db_user
+
+
 @router.delete("/phone/{phone_number}")
 def delete_user_by_phone_number(phone_number: str, db: Session = Depends(get_db)):
     users_deleted = crud.delete_user_by_phone_number(db=db, phone_number=phone_number)
