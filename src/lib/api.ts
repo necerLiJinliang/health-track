@@ -476,6 +476,21 @@ export const addChallengeParticipant = async (
   return response.json();
 };
 
+export const deleteChallenge = async (challengeId: number) => {
+  const response = await fetch(
+    `${API_BASE_URL}/challenges/${challengeId}`,
+    getAuthFetchOptions({
+      method: "DELETE",
+    }),
+  );
+
+  if (!response.ok) {
+    await handleApiError(response);
+  }
+
+  return response.json();
+};
+
 interface FamilyGroupData {
   name: string;
   owner_id: number;

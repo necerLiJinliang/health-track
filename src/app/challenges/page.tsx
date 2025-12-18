@@ -18,6 +18,7 @@ import {
   inviteUserToChallenge,
   getUserByPhone,
   getUserInfo,
+  deleteChallenge,
 } from "@/lib/api";
 import { useLoadingManager } from "@/lib/loadingManager";
 import { getErrorMessage } from "@/lib/apiErrorHandler";
@@ -315,6 +316,35 @@ export default function ChallengesPage() {
                     >
                       Invite User
                     </Button>
+                    {user && user.id === challenge.creator_id && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="flex-1"
+                        onClick={async () => {
+                          const confirmed = window.confirm(
+                            "Are you sure you want to delete this challenge?",
+                          );
+                          if (!confirmed) return;
+                          try {
+                            await deleteChallenge(challenge.id);
+                            setChallenges((prev) =>
+                              prev.filter((c) => c.id !== challenge.id),
+                            );
+                            setExpandedId((prev) =>
+                              prev === challenge.id ? null : prev,
+                            );
+                          } catch (e: any) {
+                            alert(
+                              e?.message ||
+                                "Failed to delete challenge. Please try again.",
+                            );
+                          }
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    )}
                   </div>
 
                   {expandedId === challenge.id && (

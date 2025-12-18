@@ -101,3 +101,16 @@ def filter_challenges_by_date(
     return crud.filter_challenges_by_date_range(
         db=db, start_date=sd, end_date=ed, skip=skip, limit=limit
     )
+
+
+@router.delete("/{challenge_id}")
+def delete_challenge(challenge_id: int, db: Session = Depends(get_db)):
+    # Verify challenge exists
+    db_challenge = crud.get_challenge(db, challenge_id=challenge_id)
+    if db_challenge is None:
+        raise HTTPException(status_code=404, detail="Challenge not found")
+
+    success = crud.delete_challenge(db, challenge_id=challenge_id)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to delete challenge")
+    return {"message": "Challenge deleted successfully", "challenge_id": challenge_id}

@@ -465,6 +465,29 @@ def add_participant_to_challenge(db: Session, challenge_id: int, user_id: int):
     return False
 
 
+def delete_challenge(db: Session, challenge_id: int):
+    """Delete a challenge, removing participants and related invitations first."""
+    challenge = (
+        db.query(models.Challenge).filter(models.Challenge.id == challenge_id).first()
+    )
+    if not challenge:
+        return False
+
+    # Clear participants from the association table
+    if challenge.participants:
+        challenge.participants.clear()
+
+    # Delete related invitations that reference this challenge
+    db.query(models.Invitation).filter(
+        models.Invitation.challenge_id == challenge_id
+    ).delete(synchronize_session=False)
+
+    # Delete the challenge itself
+    db.delete(challenge)
+    db.commit()
+    return True
+
+
 # Family Group CRUD operations
 def get_family_groups(db: Session):
     return db.query(models.FamilyGroup).all()
