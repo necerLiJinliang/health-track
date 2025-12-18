@@ -1,3 +1,6 @@
+import { FaceIcon } from "@radix-ui/react-icons";
+import FamilyGroupPage from "./app/familyGroup/page";
+
 export interface User {
   id: number;
   health_id: string;
@@ -57,6 +60,7 @@ export interface FamilyGroup {
   creator_id: number;
   created_at: string;
   family_group_members: FamilyMember[];
+  members: FamilyMember[];
 }
 
 export interface FamilyMember {

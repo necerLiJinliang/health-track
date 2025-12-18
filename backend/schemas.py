@@ -158,7 +158,7 @@ class FamilyGroupMember(FamilyGroupMemberBase):
 class FamilyGroup(FamilyGroupBase):
     id: int
     created_at: datetime
-    members: List[User] = []
+    # members: List[User] = []
     family_group_members: List[FamilyGroupMember] = []
 
     class Config:

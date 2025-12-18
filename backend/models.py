@@ -60,7 +60,14 @@ class User(Base):
         back_populates="participants",
     )
     family_group_memberships = relationship("FamilyGroupMember", back_populates="user")
-    # family_groups relationship is now accessed through family_group_memberships
+    family_groups = relationship(
+        "FamilyGroup",
+        secondary="family_group_members",
+        primaryjoin="User.id==FamilyGroupMember.user_id",
+        secondaryjoin="FamilyGroup.id==FamilyGroupMember.family_group_id",
+        back_populates="members",
+        viewonly=True,
+    )
 
 
 class Email(Base):
@@ -150,9 +157,16 @@ class FamilyGroup(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
-    # members relationship is now accessed through family_group_members
     family_group_members = relationship(
         "FamilyGroupMember", back_populates="family_group"
+    )
+    members = relationship(
+        "User",
+        secondary="family_group_members",
+        primaryjoin="FamilyGroup.id==FamilyGroupMember.family_group_id",
+        secondaryjoin="User.id==FamilyGroupMember.user_id",
+        back_populates="family_groups",
+        viewonly=True,
     )
 
 
@@ -162,7 +176,7 @@ class FamilyGroupMember(Base):
     id = Column(Integer, primary_key=True, index=True)
     family_group_id = Column(Integer, ForeignKey("family_groups.id"))
     user_id = Column(Integer, ForeignKey("users.id"))
-    user_name = Column(String)
+    user_name = Column(String, nullable=True)
     role = Column(String, default="member")  # member, caregiver, admin
     joined_at = Column(DateTime, default=datetime.utcnow)
 

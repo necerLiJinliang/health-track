@@ -401,7 +401,7 @@ export default function ChallengesPage() {
               invitation_type: "challenge",
               challenge_id: challengeId,
             };
-            let userInvited: User[] = [];
+            let userInvited: User | null = null;
             if (method === "email") {
               console.log("Inviting by email:", value);
               userInvited = await getUserByEmail(value);
@@ -410,11 +410,11 @@ export default function ChallengesPage() {
               userInvited = await getUserByPhone(value);
             }
             console.log("User invited:", userInvited);
-            if (userInvited.length === null) {
-              alert("The email you invited is not registered yet.");
+            if (userInvited === null) {
+              alert("The user you invited is not registered yet.");
               return;
             } else {
-              if (userInvited[0].id == user.id) {
+              if (userInvited.id == user.id) {
                 alert("You cannot invite yourself.");
                 return;
               }
@@ -422,7 +422,7 @@ export default function ChallengesPage() {
             try {
               await inviteUserToChallenge(
                 challengeId as number,
-                userInvited[0].id,
+                userInvited.id,
               );
             } catch (e: any) {
               alert(

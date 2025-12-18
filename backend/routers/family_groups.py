@@ -20,11 +20,15 @@ def create_family_group(
     family_group: schemas.FamilyGroupCreate, user_id: int, db: Session = Depends(get_db)
 ):
     # crate family member
+    db_user = crud.get_user(db, user_id=user_id)
     family_group = crud.create_family_group(
         db=db, family_group=family_group, owner_id=user_id
     )
     family_member = models.FamilyGroupMember(
-        family_group_id=family_group.id, user_id=user_id, role="admin"
+        family_group_id=family_group.id,
+        user_id=user_id,
+        role="admin",
+        user_name=db_user.name if db_user else "",
     )
     db.add(family_member)
     db.commit()
@@ -51,7 +55,6 @@ def read_family_groups_by_user(user_id: int, db: Session = Depends(get_db)):
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
     user_members = db_user.family_group_memberships
-    # print(111111, user_members)
     family_groups = [m.family_group for m in user_members]
     # family_groups_expanded = []
     # for fg in family_groups:
@@ -72,6 +75,7 @@ def read_family_groups_by_user(user_id: int, db: Session = Depends(get_db)):
     #     family_groups_expanded.append(fg_dict)
     # family_groups = family_groups_expanded
     # db_family_groups = crud.get_family_groups_by_user_id(db, user_id=user_id)
+    # return family_groups
     return family_groups
 
 
@@ -182,6 +186,16 @@ def remove_member_from_family_group(
     if db_family_group is None:
         raise HTTPException(status_code=404, detail="Family group not found")
 
+    db_family_member = (
+        db.query(models.FamilyGroupMember)
+        .filter(
+            models.FamilyGroupMember.family_group_id == family_group_id,
+            models.FamilyGroupMember.user_id == user_id,
+        )
+        .first()
+    )
+    if db_family_member is None:
+        raise HTTPException(status_code=404, detail="Family group member not found")
     # Find membership record
     membership = (
         db.query(models.FamilyGroupMember)
@@ -195,11 +209,14 @@ def remove_member_from_family_group(
         raise HTTPException(status_code=404, detail="Family group member not found")
 
     # Delete membership
+    membership_id = membership.id
     db.delete(membership)
+    db.delete(db_family_member)
     db.commit()
-    db.refresh(membership)
 
     return {
         "message": "Member removed from family group successfully",
-        "member_id": member_id,
+        "member_id": membership_id,
+        "family_group_id": family_group_id,
+        "user_id": user_id,
     }

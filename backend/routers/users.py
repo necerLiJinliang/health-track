@@ -44,7 +44,7 @@ def read_user(user_id: int, db: Session = Depends(get_db)):
     return db_user
 
 
-@router.get("/emial/{email_address}", response_model=List[schemas.User])
+@router.get("/emial/{email_address}", response_model=schemas.User)
 def read_user_by_email(email_address: str, db: Session = Depends(get_db)):
     db_user = crud.get_user_by_email_address(db, email_address=email_address)
     if db_user is None:
@@ -52,8 +52,9 @@ def read_user_by_email(email_address: str, db: Session = Depends(get_db)):
     return db_user
 
 
-@router.get("/phone/{phone_number}", response_model=List[schemas.User])
+@router.get("/phone/{phone_number}", response_model=schemas.User)
 def read_user_by_phone(phone_number: str, db: Session = Depends(get_db)):
+    print("phone_number:", phone_number)
     db_user = crud.get_user_by_phone_number(db, phone_number=phone_number)
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
@@ -142,11 +143,9 @@ def delete_email_from_user(
     db_user = crud.get_user(db, user_id=user_id)
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
-
     db_email = crud.get_email_by_address(db, email_address=email_address)
     if db_email is None or db_email not in db_user.emails:
         raise HTTPException(status_code=404, detail="Email not associated with user")
-
     db_user.emails.remove(db_email)
     db.commit()
     return {"message": "Email dissociated from user successfully"}
@@ -182,10 +181,8 @@ def dissociate_provider_from_user(
             status_code=404,
             detail="User or provider not found, or association does not exist",
         )
-
     # 然后尝试删除Provider（只有当Provider不再与任何用户关联时才会被删除）
     provider_deleted = crud.delete_provider(db, provider_id=provider_id)
-
     if provider_deleted:
         return {"message": "Provider dissociated from user and deleted successfully"}
     else:
